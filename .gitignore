@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Environment Variables
+.env
+
+# Data and Logs
+qdrant_data/
+data/uploaded_docs/
+feedback_log.jsonl
+logs/
+*.log
+
+# Editor
+.vscode/
+.idea/
+
+# Artifacts
+dist/
+build/
+*.egg-info/
