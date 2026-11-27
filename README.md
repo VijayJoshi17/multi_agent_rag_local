@@ -1,183 +1,189 @@
-# Local Multi-Agent RAG System
+# Agentic RAG
 
-> **A strictly local, privacy-focused, and free implementation of a sophisticated Agentic RAG system.**
+A multi-agent **Retrieval-Augmented Generation** system: a team of specialised agents, orchestrated with **LangGraph**, that retrieves from your documents, searches the web, analyses spreadsheets in a sandbox, and fact-checks its own answers before you see them.
 
-This project orchestrates a team of specialized AI agents to answer complex queries using your local documents, web search, and data analysis tools. It is built on **LangGraph** and runs entirely on your machine using **Ollama** and **Qdrant**.
+**FastAPI** · **LangGraph** · **React 19 + TypeScript** · **Qdrant** · **Docker Compose**. Works with free OpenRouter models or fully offline with Ollama.
+
+![Chat answer with citations and verification](docs/images/chat-answer.png)
 
 ---
 
-## Architecture & Workflow
+## Highlights
 
-The system is designed as a directed graph of autonomous agents. Each agent handles a specific cognitive task.
+- **Hybrid retrieval:** dense embeddings and BM25 keyword search, merged with Reciprocal Rank Fusion and reranked by a cross-encoder.
+- **Self-correcting answers:** an LLM-as-judge Verifier checks every claim against the sources. When it rejects an answer, the Reasoner regenerates it using the verifier's feedback.
+- **Inline citations:** answers cite `[1]`, `[2]`… and each citation opens the exact passage (with page number for PDFs).
+- **Live agent trace:** every agent's start, finish, logs and timing stream to the UI over Server-Sent Events, rendered as an animated graph. Answers stream token by token.
+- **Sandboxed data analysis:** the Data Analyst writes pandas code and runs it in an isolated container (no network, read-only filesystem, CPU/memory/time limits). If the code fails, the error goes back to the LLM for a self-repair attempt.
+- **Smart routing:** cheap retrieval signals decide documents vs. web first. The LLM is consulted only for ambiguous queries.
+- **Provider-agnostic LLM:** any OpenAI-compatible endpoint works (OpenRouter, Ollama, vLLM, OpenAI), switched with one environment variable.
+- **Production basics:** API-key auth, rate limiting, upload validation (magic bytes, zip-bomb and path-traversal guards), structured JSON logs with trace IDs, Prometheus metrics, health/readiness probes, CI.
+
+## Architecture
 
 ```mermaid
-graph TD
-    User(User Query) --> Contextualizer
-    Contextualizer[Contextualizer] --> Router{Router}
-    
-    Router -- General Query --> Retriever
-    Router -- External Info --> WebSearch
-    Router -- Data Analysis --> DataAnalyst
-    
-    subgraph Retrieval Layer
-        Retriever[Retriever]
-        WebSearch[Web Search]
-        DataAnalyst[Data Analyst]
+flowchart LR
+    subgraph Browser
+        UI[React SPA<br/>TanStack Query · React Flow]
     end
-    
-    Retriever --> Reasoner
-    WebSearch --> Reasoner
-    DataAnalyst --> Reasoner
-    
-    Reasoner[Reasoner] --> Verifier{Verify?}
-    
-    Verifier -- Accurate --> Optimizer
-    Verifier -- Hallucinated --> Reasoner
-    
-    Optimizer[Optimizer] --> Parser
-    Parser[Parser] --> FinalOutput(Final Response)
-    
-    style User fill:#f9f,stroke:#333
-    style FinalOutput fill:#f9f,stroke:#333
-    style Verifier fill:#ffeb3b,stroke:#333
-    style Reasoner fill:#b39ddb,stroke:#333
+    subgraph Docker["Docker Compose"]
+        NG[nginx<br/>static + reverse proxy]
+        API[FastAPI<br/>LangGraph agents]
+        QD[(Qdrant<br/>vectors)]
+        DB[(SQLite<br/>conversations, docs)]
+        SB[Sandbox<br/>pandas executor]
+    end
+    LLM[(LLM provider<br/>OpenRouter / Ollama)]
+    WEB[(DuckDuckGo<br/>Yahoo Finance)]
+
+    UI -- REST + SSE --> NG --> API
+    API --> QD
+    API --> DB
+    API -- internal network only --> SB
+    API --> LLM
+    API --> WEB
 ```
 
-### The Agent Team
+### The agent graph
 
-| Agent | Icon | Role |
-|-------|------|------|
-| **Contextualizer** | 🔄 | Refines the user's query by resolving pronouns (e.g., "it", "he") using chat history. |
-| **Router** | 🚥 | Analyzes the intent to route the task: **RAG** (Internal Docs), **Web Search** (Live Internet), or **Data Analysis** (Python Code). |
-| **Retriever** | 🔍 | Performs **Hybrid Search** (Vector + BM25) and uses a **Cross-Encoder** to rerank the top results for maximum relevance. |
-| **Web Search** | 🌍 | Fetches real-time information using DuckDuckGo when internal docs are insufficient. |
-| **Data Analyst** | 📊 | Writes and executes secure Python code (Pandas/Matplotlib) to analyze CSV/Excel files and generate insights. |
-| **Reasoner** | 🧠 | Synthesizes the retrieved information into a coherent, fact-based answer. |
-| **Verifier** | ✅ | (Optional) Cross-checks the Reasoner's valid claims against the source documents to prevent hallucinations. |
-| **Optimizer** | ⚙️ | Logs feedback to improve future prompts (Self-Correction loop). |
-| **Parser** | 📝 | Formats the final raw text into beautiful, readable Markdown (Executive Summary, Details, Key Takeaways). |
+```mermaid
+flowchart LR
+    C[Contextualize] --> R{Router}
+    R -- documents --> RET[Hybrid Retrieval]
+    R -- web --> W[Web Search]
+    R -- data --> D[Data Analyst]
+    RET -- no relevant hits --> W
+    RET --> RE[Reasoner]
+    W --> RE
+    D --> RE
+    RE --> V{Verifier}
+    V -- unsupported, retries left --> RE
+    V -- supported --> E((Answer))
+```
 
----
+| Agent | What it does |
+|---|---|
+| **Contextualize** | Rewrites follow-ups ("what about its population?") into standalone questions. Skipped when there is no history. |
+| **Router** | Uses semantic and BM25 relevance scores plus live-information keywords to choose documents or web search. Falls back to an LLM classifier only when the signals are ambiguous. |
+| **Hybrid Retrieval** | Dense search (MiniLM embeddings) and BM25, fused with RRF and reranked by a cross-encoder (`ms-marco-MiniLM-L-6-v2`). Falls back to web search if nothing relevant is found. |
+| **Web Search** | One LLM call plans the search query and detects stock tickers. Runs a DuckDuckGo search and, when relevant, fetches a live Yahoo Finance quote. |
+| **Data Analyst** | Writes pandas code from the dataset schema and sample rows, executes it in the sandbox, and repairs it once if it fails. |
+| **Reasoner** | Streams a grounded, cited, Markdown-formatted answer. |
+| **Verifier** | Returns a JSON verdict (`supported` / `unsupported`) with a reason. A rejection triggers regeneration. |
 
-## Key Features
+![Agent trace in dark mode](docs/images/agent-trace-dark.png)
 
-- **100% Local & Free**: Uses `Ollama` (Phi-3/Llama-3) and `SentenceTransformers` (`all-MiniLM-L6-v2`). No API costs.
-- **Hybrid Retrieval**: Combines semantic search (embeddings) with keyword search (BM25) for best-in-class accuracy.
-- **Deep Monitoring**: Watch every step of the agent's thought process in the "Live Execution Logs".
-- **Self-Correction**: The `Verifier` agent can reject an answer and send it back to the `Reasoner` if it's not supported by facts.
-- **Dynamic Formatting**: The `Parser` agent adapts the output format based on the complexity of your question.
-
----
-
-## Getting Started
-
-### Prerequisites
-1.  **Python 3.10+**
-2.  **Ollama**: [Download & Install](https://ollama.com/)
-3.  **Pull the Model**:
-    ```bash
-    ollama pull phi3
-    ```
-
-### Installation
-
-1.  **Clone the Repository**:
-    ```bash
-    git clone https://github.com/your-username/multi-agent-rag-local.git
-    cd multi-agent-rag-local
-    ```
-
-2.  **Install Dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-3.  **Setup Environment**:
-    copy `.env.example` to `.env` (Defaults are usually fine for local run).
-
-### Running the App
-
-1.  **Start the UI**:
-    ```bash
-    streamlit run streamlit_app.py
-    ```
-
-2.  **Upload Documents**:
-    - Open the Sidebar.
-    - Upload PDFs, DOCX, MD, or TXT files.
-    - Click **"Process Documents"**.
-
-3.  **Chat**:
-    - Ask questions like "Summarize the uploaded PDF" or "What is the policy?"
-    - Toggle **"Enable Verifier"** for higher accuracy (slower) or disable it for speed.
-
----
-
-## Configuration
-
-Edit `app/config.py` or `.env` to customize:
-
-- **`LLM_MODEL`**: Change to `llama3`, `mistral`, or `gemma` (ensure you pulled it in Ollama).
-- **`EMBEDDING_MODEL`**: Change the HuggingFace model for vectorization.
-- **`TOP_K`**: Adjust how many documents are retrieved (default: 5).
-
----
-
-## Project Structure
-
-A structured breakdown of the codebase:
+## Quick start (Docker)
 
 ```bash
-multi_agent_rag_local/
-├── app/
-│   ├── agents/                 # 🤖 The Brains
-│   │   ├── supervisor.py       # Orchestrates the entire workflow (LangGraph)
-│   │   ├── retriever.py        # Handles Hybrid Search & Reranking
-│   │   ├── reasoner.py         # Generates answers using the LLM
-│   │   ├── web_search.py       # Interacts with DuckDuckGo
-│   │   ├── data_analyst.py     # Executes Python code analysis
-│   │   ├── router.py           # Routes queries to appropriate agents
-│   │   ├── verifier.py         # Cross-checks answers against source documents
-│   │   ├── optimizer.py        # Logs feedback for future tuning
-│   │   ├── parser.py           # Formats the final raw text into beautiful, readable 
-│   │   └── contextualizer.py   # Refines the user's query by resolving pronouns (e.g., "it", "he") using chat history.
-│   │   └── base.py             # Base class for agents
-│   │   └── summarizer.py       # Summarizes the retrieved documents
-│   ├── rag/                    # 📚 The Knowledge Base
-│   │   ├── ingestion.py        # File processing logic (PDF, DOCX, etc.)
-│   │   ├── vector_store.py     # Qdrant client wrapper
-│   │   ├── bm25_retriever.py   # In-memory keyword search
-│   │   └── embeddings.py       # Embeddings logic
-│   ├── models/                 # 🏗️ Data Structures
-│   │   └── schemas.py          # Pydantic models (AgentState, Answer, etc.)
-│   ├── api/                    # 🔌 Backend API
-│   │   ├── chat.py             # Chat endpoints
-│   │   └── upload.py           # File upload & reset endpoints
-│   ├── prompts/                # 📝 Instructions
-│   │   ├── parser.txt          # System prompts for agents
-│   │   ├── retriever.txt       # System prompts for agents
-│   │   ├── reasoner.txt        # System prompts for agents
-│   │   ├── verifier.txt        # System prompts for agents
-│   │   ├── optimizer.txt       # System prompts for agents
-│   │   └── summarizer.txt      # System prompts for agents
-│   ├── utils/                  # 📝 Instructions
-│   │   └── logger.py           # Logger
-│   ├── config.py               # Settings & Constants
-│   └── main.py                 # FastAPI Entry Point
-├── data/                       # 📂 Storage
-│   └── uploaded_docs/          # Raw files uploaded by user
-├── qdrant_data/                # Persistent vector database storage
-├── streamlit_app.py            # 🖥️ Frontend UI (Streamlit)
-├── requirements.txt            # Python Dependencies
-└── .env                        # Secrets & Config
+cp .env.example .env
+# Edit .env and set:
+#   API_KEY=<any long random string>   # python -c "import secrets; print(secrets.token_urlsafe(32))"
+#   LLM_API_KEY=<your OpenRouter key>  # https://openrouter.ai/keys
+
+docker compose up --build
 ```
 
----
+Open **http://localhost:8080** and enter your `API_KEY` when prompted. Then upload documents on the **Knowledge base** page, or a CSV on **Datasets**, and start asking.
 
-## Troubleshooting
+**Fully local (no API keys):**
 
-- **"Ollama Connection Refused"**: Ensure Ollama is running (`ollama serve` or open the desktop app).
-- **"Qdrant Error"**: If the vector DB gets stuck, click **"Reset Knowledge Base"** in the Sidebar to wipe it clean.
+```bash
+docker compose --profile ollama up --build
+docker compose exec ollama ollama pull llama3.1:8b
+# in .env: LLM_BASE_URL=http://ollama:11434/v1  LLM_MODEL=llama3.1:8b  LLM_API_KEY=
+```
 
----
+### Choosing a model
 
+Any OpenRouter model id works (`LLM_MODEL=...`). Free models end in `:free` ([list](https://openrouter.ai/models?max_price=0)). Good choices:
+
+- `meta-llama/llama-3.3-70b-instruct:free` (default): strong instruction following and citations.
+- `deepseek/deepseek-chat-v3-0324:free`: strong at the Data Analyst's code generation.
+
+Free tiers are rate-limited, so the pipeline is designed to keep LLM calls low. Contextualize and Router are skipped when not needed, Web Search plans the query and detects tickers in a single call, and the Reasoner writes the final formatting directly. A typical question costs **2 calls** (answer + verify).
+
+## Local development
+
+**Prerequisites:** Python 3.11+, Node 20+.
+
+```bash
+# Backend: http://localhost:8000 (OpenAPI docs at /docs)
+cd backend
+python -m venv .venv && .venv/Scripts/activate        # Windows (macOS/Linux: source .venv/bin/activate)
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -e ".[dev]"
+cp ../.env.example .env                                # then set LLM_* values
+uvicorn app.main:create_app --factory --reload
+
+# Sandbox: http://localhost:8001 (only needed for data analysis)
+cd sandbox
+DATASETS_DIR=../backend/storage/datasets uvicorn app:app --port 8001
+
+# Frontend: http://localhost:5173 (proxies /api to :8000)
+cd frontend
+npm install
+npm run dev
+```
+
+Without `API_KEY` set, auth is disabled. This is only allowed outside `ENVIRONMENT=prod`, and the server refuses to start in prod without a key.
+
+## Testing
+
+```bash
+cd backend  && pytest -q          # API + agent graph tests (fake LLM, in-memory Qdrant)
+cd sandbox  && pytest -q          # sandbox escape attempts, timeouts, real subprocess execution
+cd frontend && npm test           # SSE parser, stream reducer, citation linking
+```
+
+The backend suite runs the **whole graph** through the HTTP API with deterministic fakes. It covers routing, web fallback on an empty knowledge base, the verifier-rejection → regeneration loop, data-analyst self-repair, zip traversal and spoofed-file rejection, auth, and conversation persistence. CI runs all three suites and builds the Docker images.
+
+## API
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/chat/stream` | Ask a question. Streams SSE events: `start`, `node_start`, `node_end`, `log`, `code`, `token`, `answer_reset`, `final`, `error` |
+| `GET` | `/api/v1/conversations` · `/{id}` | List conversations / get one with its messages |
+| `PATCH` / `DELETE` | `/api/v1/conversations/{id}` | Rename / delete a conversation |
+| `POST` | `/api/v1/messages/{id}/feedback` | 👍 / 👎 on an answer |
+| `POST` | `/api/v1/documents` | Upload documents (PDF, DOCX, PPTX, TXT, MD, ZIP). Indexed in the background |
+| `GET` / `DELETE` | `/api/v1/documents[/{id}]` | List documents with ingestion status / delete one |
+| `GET` / `DELETE` | `/api/v1/knowledge-base[/stats]` | Stats / reset everything |
+| `POST` / `GET` | `/api/v1/datasets` | Upload / list CSV and XLSX datasets |
+| `GET` | `/api/v1/datasets/{id}/preview` | First rows of a dataset |
+| `GET` | `/api/v1/health/live` · `/ready` | Liveness / readiness (DB, vector store, LLM, sandbox) |
+| `GET` | `/metrics` | Prometheus metrics: request latency, per-agent latency, LLM latency, routes, verdicts |
+
+All endpoints except health require the `X-API-Key` header when auth is enabled.
+
+## Security notes
+
+- **Sandbox, in layers.** The validator rejects disallowed imports, dunder access and file or network I/O (including `df.query`/`eval`, whose string expressions would bypass AST checks). Code then runs with restricted builtins, in a short-lived subprocess with `RLIMIT_CPU`/`AS`/`FSIZE`/`NOFILE` limits and a minimal environment. That subprocess lives in a container with no internet route, a read-only root filesystem, no Linux capabilities, `no-new-privileges`, pid/memory/CPU caps, and only the datasets volume mounted (read-only).
+- **Uploads** are size-capped while streaming, type-checked by magic bytes, and parsed in memory. ZIP archives are never extracted to disk, so zip-slip is impossible by construction, and member count and uncompressed size are capped.
+- **Auth** is enforced in middleware with a constant-time comparison, so it always runs before any route dependency. Internal errors return a generic envelope with a trace ID; details go to the logs.
+
+## Project structure
+
+```
+backend/
+  app/
+    agents/        one class per agent (graph node)
+    graph/         LangGraph workflow, state, streaming context
+    services/      LLM client, embeddings, vector store, BM25, ingestion, datasets, chat, sandbox client
+    api/routes/    chat (SSE), conversations, documents, datasets, health
+    core/          config, logging, errors, security
+    db/            SQLAlchemy models
+    prompts/       agent system prompts
+    container.py   composition root (builds every service once)
+  tests/
+sandbox/           isolated code-execution service
+frontend/          React + Vite + Tailwind SPA, served by nginx
+docker-compose.yml
+```
+
+## Roadmap
+
+- Alembic migrations and a Postgres profile for multi-user deployments
+- Qdrant sparse vectors in place of the in-memory BM25 index for very large corpora
+- An offline RAG evaluation set (retrieval recall, groundedness) run in CI
+- OCR for scanned PDFs
