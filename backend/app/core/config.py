@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 150
     CANDIDATE_POOL: int = 30
+    # Head of the fused list sent to the cross-encoder. 10 matched 20/40 on the retrieval eval
+    # (backend/eval) at half the latency; see eval/results/retrieval-latest.md.
+    RERANK_CANDIDATES: int = 10
     DEFAULT_TOP_K: int = 5
     ROUTER_SEMANTIC_HIGH: float = 0.45
     ROUTER_SEMANTIC_LOW: float = 0.30

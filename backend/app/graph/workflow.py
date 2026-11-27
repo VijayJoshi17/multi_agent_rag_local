@@ -15,6 +15,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
 from app.agents.base import Agent
+from app.agents.reasoner import is_refusal
 from app.graph.context import Emit, NodeContext
 from app.graph.state import GraphState
 from app.services.metrics import NODE_LATENCY
@@ -72,6 +73,8 @@ def build_workflow(agents: Agents, max_verify_retries: int):
     def after_reason(s: GraphState) -> str:
         evidence = s.get("evidence") or []
         grounded = [c for c in evidence if c.kind != "system"]
+        if is_refusal(s.get("answer", "")):
+            return END  # nothing to fact-check in "not found"
         if s.get("verify", True) and grounded and s.get("route") != "data_analyst":
             return "verify"
         return END

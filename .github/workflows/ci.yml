@@ -27,12 +27,42 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[dev]"
       - name: Lint
-        run: ruff check app tests ../sandbox
+        run: ruff check app tests eval ../sandbox
       - name: Test backend
         run: pytest -q
       - name: Test sandbox
         working-directory: sandbox
         run: pytest -q
+
+  # Retrieval quality gate: fails the build if recall@5 / MRR regress below the thresholds in
+  # backend/eval/retrieval.py. Real embedding + reranker models, no LLM, ~2 minutes.
+  rag-eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ hashFiles('backend/app/core/config.py') }}
+      - name: Install
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+      - name: Retrieval evaluation
+        run: python -m eval.retrieval --check
+        env:
+          LOG_LEVEL: WARNING
+      - name: Publish report
+        if: always()
+        run: cat eval/results/retrieval-latest.md >> "$GITHUB_STEP_SUMMARY"
 
   frontend:
     runs-on: ubuntu-latest
