@@ -1,25 +1,72 @@
+# ---------------------------------------------------------------------------
+# Secrets / local config
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
 # Python
+# ---------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
 venv/
 env/
+*.egg-info/
+.eggs/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
 
-# Environment Variables
-.env
+# ---------------------------------------------------------------------------
+# Node / frontend
+# ---------------------------------------------------------------------------
+node_modules/
+frontend/dist/
+dist/
+*.tsbuildinfo
+.vite/
+coverage/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Data and Logs
+# ---------------------------------------------------------------------------
+# Runtime data (never commit user documents, DBs or vector indexes)
+# ---------------------------------------------------------------------------
+storage/
+backend/storage/
 qdrant_data/
 data/uploaded_docs/
+*.db
+*.db-journal
+*.sqlite3
 feedback_log.jsonl
 logs/
 *.log
 
-# Editor
-.vscode/
-.idea/
+# Hugging Face / model caches
+.cache/
+hf_cache/
 
-# Artifacts
-dist/
-build/
-*.egg-info/
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code local settings
+.claude/settings.local.json

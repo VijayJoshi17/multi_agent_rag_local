@@ -1,0 +1,83 @@
+name: agentic-rag
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [public]
+
+  api:
+    build: ./backend
+    env_file: .env
+    environment:
+      ENVIRONMENT: prod
+      LOG_JSON: "true"
+      DATA_DIR: /data
+      DATABASE_URL: sqlite+aiosqlite:////data/app.db
+      QDRANT_URL: http://qdrant:6333
+      SANDBOX_URL: http://sandbox:8001
+      CORS_ORIGINS: http://localhost:${HTTP_PORT:-8080}
+    volumes:
+      - app-data:/data
+      - datasets:/data/datasets
+    depends_on:
+      qdrant:
+        condition: service_started
+      sandbox:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [public, internal]
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.2
+    volumes:
+      - qdrant-data:/qdrant/storage
+    restart: unless-stopped
+    networks: [internal]
+
+  # Executes LLM-written pandas code. No internet (internal-only network), read-only root FS,
+  # non-root user, no Linux capabilities, CPU/memory/pid caps, datasets mounted read-only.
+  sandbox:
+    build: ./sandbox
+    environment:
+      DATASETS_DIR: /data/datasets
+      SANDBOX_MEMORY_MB: "768"
+    volumes:
+      - datasets:/data/datasets:ro   # only the datasets, never the DB or documents
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 1g
+    cpus: 1.0
+    restart: unless-stopped
+    networks: [internal]
+
+  # Optional fully-local LLM: `docker compose --profile ollama up`, then set
+  # LLM_BASE_URL=http://ollama:11434/v1 and LLM_MODEL=llama3.1:8b in .env
+  ollama:
+    image: ollama/ollama:latest
+    profiles: [ollama]
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks: [internal, public]
+
+networks:
+  public:
+  internal:
+    internal: true   # no route to the internet
+
+volumes:
+  app-data:
+  datasets:
+  qdrant-data:
+  ollama-data:
