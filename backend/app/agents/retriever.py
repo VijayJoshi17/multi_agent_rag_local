@@ -32,30 +32,51 @@ class RetrieverAgent(Agent):
                  reranker: Reranker | None, settings: Settings):
         self.embedder, self.store, self.bm25, self.reranker = embedder, store, bm25, reranker
         self.pool = settings.CANDIDATE_POOL
+        self.rerank_candidates = settings.RERANK_CANDIDATES
+
+    async def retrieve(
+        self, query: str, top_k: int, *, dense: bool = True, sparse: bool = True,
+        rerank: bool = True, rerank_candidates: int | None = None,
+    ) -> tuple[list[Chunk], list[str]]:
+        """The retrieval pipeline. Flags exist so the evaluation harness can ablate stages."""
+        notes: list[str] = []
+        lists, weights = [], []
+        if dense:
+            vec = await self.embedder.embed_query(query)
+            lists.append(await self.store.search(vec, limit=self.pool))
+            weights.append(1.0)
+        if sparse:
+            lists.append(await self.bm25.search(query, k=self.pool))
+            weights.append(1.0)
+        notes.append(" · ".join(
+            f"{name}: {len(r)} candidates"
+            for name, r in zip([n for n, on in (("Dense", dense), ("BM25", sparse)) if on], lists,
+                               strict=True)
+        ))
+        fused = reciprocal_rank_fusion(lists, weights) if len(lists) > 1 else (lists or [[]])[0]
+        if not fused:
+            return [], notes
+
+        if rerank and self.reranker:
+            # Rerank only the head of the fused list: cross-encoder cost is linear in candidates.
+            n = rerank_candidates or self.rerank_candidates
+            head = fused[:n]
+            scores = await self.reranker.score(query, [c.text for c in head])
+            ranked = sorted(zip(head, scores, strict=True), key=lambda x: x[1], reverse=True)
+            # No absolute score cut-off: cross-encoder logits are not calibrated across query
+            # styles (paraphrases score low even when relevant). Keep the top-k; the reasoner
+            # is instructed to say so when the passages don't answer the question.
+            fused = [c.model_copy(update={"score": s}) for c, s in ranked]
+            notes.append(f"Cross-encoder reranked {len(head)}; top score {ranked[0][1]:.2f}")
+        return fused[:top_k], notes
 
     async def __call__(self, state: GraphState, ctx: NodeContext) -> dict[str, Any]:
-        query = state["query"]
-        top_k = state.get("top_k", 5)
-
-        dense = await self.store.search(await self.embedder.embed_query(query), limit=self.pool)
-        sparse = await self.bm25.search(query, k=self.pool)
-        await ctx.log(f"Dense: {len(dense)} candidates · BM25: {len(sparse)} candidates")
-
-        fused = reciprocal_rank_fusion([dense, sparse], weights=[1.0, 1.0])
-        if not fused:
+        evidence, notes = await self.retrieve(state["query"], state.get("top_k", 5))
+        for note in notes:
+            await ctx.log(note)
+        if not evidence:
             await ctx.log("No candidates found in the knowledge base.")
             return {"evidence": []}
-
-        if self.reranker:
-            scores = await self.reranker.score(query, [c.text for c in fused])
-            reranked = sorted(zip(fused, scores, strict=True), key=lambda x: x[1], reverse=True)
-            # Drop clearly irrelevant passages (ms-marco logits < -5 are near-zero relevance).
-            fused = [c.model_copy(update={"score": s}) for c, s in reranked if s > -5] or [
-                reranked[0][0]
-            ]
-            await ctx.log(f"Cross-encoder reranked; top score {reranked[0][1]:.2f}")
-
-        evidence = fused[:top_k]
         await ctx.log("Selected: " + ", ".join(
             f"{c.source}{f' p.{c.page}' if c.page else ''}" for c in evidence
         ))

@@ -26,7 +26,10 @@ class SentenceTransformerEmbedder:
 
         logger.info("Loading embedding model %s", model_name)
         self._model = SentenceTransformer(model_name, device="cpu")
-        self.dimension: int = int(self._model.get_sentence_embedding_dimension() or 384)
+        get_dim = getattr(self._model, "get_embedding_dimension", None) or (
+            self._model.get_sentence_embedding_dimension
+        )
+        self.dimension: int = int(get_dim() or 384)
 
     def _encode(self, texts: list[str]) -> list[list[float]]:
         vecs = self._model.encode(

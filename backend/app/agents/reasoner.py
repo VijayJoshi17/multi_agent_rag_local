@@ -5,10 +5,18 @@ from app.graph.context import NodeContext
 from app.graph.state import GraphState
 from app.services.llm import LLMClient
 
+# The reasoner prompt asks for this exact opening when the sources lack the answer. The graph
+# uses it to skip verification: a refusal makes no factual claims to check.
+NOT_FOUND_PREFIX = "I couldn't find this in the available sources."
+
 NO_EVIDENCE_ANSWER = (
-    "I couldn't find relevant information to answer that. Try uploading related documents, "
-    "rephrasing the question, or switching to web search mode."
+    f"{NOT_FOUND_PREFIX} Try uploading related documents, rephrasing the question, "
+    "or switching to web search mode."
 )
+
+
+def is_refusal(answer: str) -> bool:
+    return answer.lstrip().lower().startswith(NOT_FOUND_PREFIX.lower().rstrip("."))
 
 
 class ReasonerAgent(Agent):

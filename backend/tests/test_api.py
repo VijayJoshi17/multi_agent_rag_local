@@ -206,3 +206,14 @@ def test_prod_requires_api_key(tmp_path):
     s = Settings(_env_file=None, ENVIRONMENT="prod", DATA_DIR=tmp_path)  # type: ignore[call-arg]
     with pytest.raises(RuntimeError):
         create_app(s)
+
+
+async def test_refusal_skips_verification(client, llm):
+    llm.replies["reasoner"] = (
+        "I couldn't find this in the available sources. Try uploading the HR policy."
+    )
+    await upload_text(client, "france.txt", FRANCE)
+    events = await ask(client, "Who is the CEO?", mode="documents")
+    assert "verify" not in [e.get("node") for e in events]
+    assert llm.calls["verifier"] == 0
+    assert events[-1]["message"]["meta"]["verification"]["verdict"] == "skipped"
