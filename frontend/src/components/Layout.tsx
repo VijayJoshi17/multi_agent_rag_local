@@ -36,7 +36,7 @@ export function Layout() {
           <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" className="grid size-8 place-items-center rounded-md hover:bg-sunken">
             <Menu className="size-4" />
           </button>
-          <span className="text-sm font-semibold">Agentic RAG</span>
+          <span className="text-sm font-medium">Agentic RAG</span>
         </header>
         <div className="min-h-0 flex-1">
           <Outlet />
@@ -54,7 +54,7 @@ function Sidebar({ onClose }: { onClose: () => void }) {
     <>
       <div className="flex h-14 items-center gap-2.5 px-4">
         <img src="/favicon.svg" alt="" className="size-6" />
-        <span className="text-[15px] font-semibold tracking-tight">Agentic RAG</span>
+        <span className="text-md font-medium">Agentic RAG</span>
         <button type="button" onClick={onClose} aria-label="Close menu" className="ml-auto grid size-7 place-items-center rounded-md hover:bg-sunken md:hidden">
           <X className="size-4" />
         </button>
@@ -66,13 +66,13 @@ function Sidebar({ onClose }: { onClose: () => void }) {
           className="flex h-9 w-full items-center gap-2 rounded-lg border border-line bg-panel px-3 text-sm font-medium shadow-sm hover:bg-sunken cursor-pointer"
         >
           <Plus className="size-4" /> New chat
-          <kbd className="ml-auto hidden rounded border border-line px-1 text-[10px] text-faint sm:block">⌘K</kbd>
+          <kbd className="ml-auto hidden rounded border border-line px-1 font-mono text-xs text-faint sm:block">⌘K</kbd>
         </button>
       </div>
 
       <div className="mt-4 min-h-0 flex-1 overflow-y-auto px-2">
-        <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-faint">History</p>
-        {conversations.data?.length === 0 && <p className="px-2 py-2 text-[12.5px] text-muted">No conversations yet.</p>}
+        <p className="px-2 pb-2 text-xs text-faint">History</p>
+        {conversations.data?.length === 0 && <p className="px-2 py-2 text-sm text-muted">No conversations yet.</p>}
         <ul className="space-y-px">
           {conversations.data?.map((c) => (
             <ConversationItem key={c.id} c={c} />
@@ -87,7 +87,7 @@ function Sidebar({ onClose }: { onClose: () => void }) {
             to={to}
             className={({ isActive }) =>
               cn(
-                'flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] transition-colors',
+                'flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm transition-colors',
                 isActive ? 'bg-sunken font-medium text-ink' : 'text-muted hover:bg-sunken hover:text-ink',
               )
             }
@@ -140,7 +140,7 @@ function ConversationItem({ c }: { c: Conversation }) {
               setEditing(false)
             }
           }}
-          className="h-8 w-full rounded-md border border-accent bg-panel px-2 text-[13px]"
+          className="h-8 w-full rounded-md border border-accent bg-panel px-2 text-sm"
           aria-label="Conversation title"
         />
       </li>
@@ -152,7 +152,7 @@ function ConversationItem({ c }: { c: Conversation }) {
       <NavLink
         to={`/c/${c.id}`}
         className={cn(
-          'flex h-8 items-center gap-2 rounded-md px-2 pr-14 text-[13px] transition-colors',
+          'flex h-8 items-center gap-2 rounded-md px-2 pr-14 text-sm transition-colors',
           active ? 'bg-sunken text-ink' : 'text-muted hover:bg-sunken/70 hover:text-ink',
         )}
         title={`${c.title} · ${timeAgo(c.updated_at)}`}

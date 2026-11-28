@@ -24,12 +24,12 @@ export function SourceList({ sources, highlighted }: { sources: Source[]; highli
               refs.current[i] = el
             }}
             className={cn(
-              'group rounded-lg border bg-panel p-2.5 text-[12.5px] transition-colors',
-              highlighted === i + 1 ? 'border-accent ring-2 ring-accent/20' : 'border-line',
+              'group rounded-lg border bg-panel p-2.5 text-sm transition-colors',
+              highlighted === i + 1 ? 'border-accent' : 'border-line',
             )}
           >
             <div className="mb-1 flex items-center gap-1.5 text-muted">
-              <span className="grid size-4 place-items-center rounded bg-sunken text-[10px] font-semibold text-ink">{i + 1}</span>
+              <span className="w-4 shrink-0 font-mono text-xs text-accent-ink">{i + 1}</span>
               <Icon className="size-3.5 shrink-0" />
               <span className="truncate font-medium text-ink" title={s.source}>
                 {s.source}

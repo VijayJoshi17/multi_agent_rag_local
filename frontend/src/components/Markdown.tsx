@@ -24,14 +24,17 @@ export function Markdown({
             if (href?.startsWith('#cite-')) {
               const n = Number(href.slice(6))
               return (
-                <button
-                  type="button"
-                  onClick={() => onCite?.(n)}
-                  className="mx-0.5 inline-grid h-[18px] min-w-[18px] place-items-center rounded bg-accent-soft px-1 align-[1px] text-[10.5px] font-semibold text-accent-ink no-underline hover:bg-accent hover:text-white cursor-pointer"
-                  aria-label={`Source ${n}`}
-                >
-                  {n}
-                </button>
+                <sup>
+                  <button
+                    type="button"
+                    onClick={() => onCite?.(n)}
+                    // <sup> has line-height 0; inline-block + padding keeps a clickable target
+                    className="-mx-0.5 inline-block rounded px-1 py-0.5 font-mono text-[0.68em] leading-none text-accent-ink underline-offset-2 hover:bg-accent-soft hover:underline cursor-pointer"
+                    aria-label={`Source ${n}`}
+                  >
+                    {n}
+                  </button>
+                </sup>
               )
             }
             return (

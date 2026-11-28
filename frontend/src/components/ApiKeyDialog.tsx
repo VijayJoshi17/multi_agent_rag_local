@@ -27,10 +27,10 @@ export function ApiKeyDialog() {
         <div className="mb-4 grid size-10 place-items-center rounded-xl bg-accent-soft text-accent">
           <KeyRound className="size-5" />
         </div>
-        <h2 id="key-title" className="text-base font-semibold">
+        <h2 id="key-title" className="text-lg font-medium">
           API key required
         </h2>
-        <p className="mt-1 text-[13px] text-muted">
+        <p className="mt-1 text-sm text-muted">
           This server is protected. Enter the <code className="rounded bg-sunken px-1">API_KEY</code> from its <code className="rounded bg-sunken px-1">.env</code>.
         </p>
         <input

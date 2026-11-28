@@ -12,7 +12,7 @@ const variants: Record<Variant, string> = {
   danger: 'bg-panel border border-line text-bad hover:bg-bad-soft hover:border-bad/40',
 }
 const sizes: Record<Size, string> = {
-  sm: 'h-8 px-3 text-[13px] gap-1.5',
+  sm: 'h-8 px-3 text-sm gap-1.5',
   md: 'h-9 px-4 text-sm gap-2',
   icon: 'h-8 w-8 justify-center',
 }
@@ -54,7 +54,7 @@ const tones: Record<Tone, string> = {
 
 export function Badge({ tone = 'neutral', className, children }: { tone?: Tone; className?: string; children: ReactNode }) {
   return (
-    <span className={cn('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium leading-none', tones[tone], className)}>
+    <span className={cn('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium leading-none', tones[tone], className)}>
       {children}
     </span>
   )
@@ -73,7 +73,7 @@ export function EmptyState({ icon, title, children }: { icon: ReactNode; title: 
     <div className="flex flex-col items-center justify-center text-center py-14 px-6">
       <div className="mb-3 grid size-11 place-items-center rounded-xl bg-sunken text-muted">{icon}</div>
       <p className="text-sm font-medium">{title}</p>
-      {children && <div className="mt-1 max-w-sm text-[13px] text-muted">{children}</div>}
+      {children && <div className="mt-1 max-w-sm text-sm text-muted">{children}</div>}
     </div>
   )
 }
@@ -82,7 +82,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return (
     <div className="flex flex-wrap items-end justify-between gap-4 pb-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-2xl font-medium">{title}</h1>
         {description && <p className="mt-1 text-sm text-muted">{description}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
@@ -112,7 +112,7 @@ export function Segmented<T extends string>({
           title={o.title}
           onClick={() => onChange(o.value)}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-[12.5px] font-medium transition-colors cursor-pointer',
+            'inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-sm font-medium transition-colors cursor-pointer',
             value === o.value ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink',
           )}
         >
@@ -126,7 +126,7 @@ export function Segmented<T extends string>({
 
 export function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <label className="inline-flex items-center gap-2 text-[12.5px] text-muted cursor-pointer select-none">
+    <label className="inline-flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
       <button
         type="button"
         role="switch"

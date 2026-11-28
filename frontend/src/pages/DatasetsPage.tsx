@@ -73,11 +73,11 @@ export function DatasetsPage() {
                       current?.id === d.id ? 'border-accent/50 bg-accent-soft/40' : 'border-line bg-panel hover:bg-sunken',
                     )}
                   >
-                    <div className="flex items-center gap-2 text-[13px] font-medium">
+                    <div className="flex items-center gap-2 text-sm font-medium">
                       <Table2 className="size-4 shrink-0 text-muted" />
                       <span className="truncate">{d.filename}</span>
                     </div>
-                    <p className="mt-0.5 pl-6 text-[11.5px] text-muted">
+                    <p className="mt-0.5 pl-6 text-xs text-muted">
                       {d.row_count.toLocaleString()} rows · {formatBytes(d.size_bytes)} · {timeAgo(d.created_at)}
                     </p>
                   </button>
@@ -97,7 +97,7 @@ function DatasetDetail({ d, onAnalyze, onDelete }: { d: Dataset; onAnalyze: () =
   return (
     <Card className="min-w-0 overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-        <h2 className="mr-auto truncate text-sm font-semibold">{d.filename}</h2>
+        <h2 className="mr-auto truncate text-base font-medium">{d.filename}</h2>
         <Button size="sm" variant="primary" onClick={onAnalyze}>
           <MessageSquare className="size-3.5" /> Analyze in chat
         </Button>
@@ -119,7 +119,7 @@ function DatasetDetail({ d, onAnalyze, onDelete }: { d: Dataset; onAnalyze: () =
             <Spinner />
           </div>
         ) : preview.data ? (
-          <table className="w-full text-[12.5px]">
+          <table className="w-full text-sm">
             <thead className="sticky top-0 bg-sunken text-left">
               <tr>
                 {preview.data.columns.map((c) => (
@@ -145,7 +145,7 @@ function DatasetDetail({ d, onAnalyze, onDelete }: { d: Dataset; onAnalyze: () =
           <p className="p-4 text-sm text-muted">Preview unavailable.</p>
         )}
       </div>
-      <p className="border-t border-line px-4 py-2 text-[11.5px] text-muted">
+      <p className="border-t border-line px-4 py-2 text-xs text-muted">
         Showing first {preview.data?.rows.length ?? 0} of {d.row_count.toLocaleString()} rows
       </p>
     </Card>

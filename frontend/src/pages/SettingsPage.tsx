@@ -29,7 +29,7 @@ export function SettingsPage() {
         <section className="space-y-4">
           <Card className="p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">System status</h2>
+              <h2 className="text-base font-medium">System status</h2>
               <Button size="sm" variant="ghost" onClick={() => health.refetch()} aria-label="Refresh status">
                 <RefreshCw className={health.isFetching ? 'size-3.5 animate-spin' : 'size-3.5'} />
               </Button>
@@ -40,15 +40,15 @@ export function SettingsPage() {
               <p className="mt-3 text-sm text-bad">Backend unreachable: {health.error.message}</p>
             ) : (
               <>
-                <p className="mt-1 text-[12.5px] text-muted">
+                <p className="mt-1 text-sm text-muted">
                   Model <code className="rounded bg-sunken px-1">{health.data!.llm_model}</code> · API v{health.data!.version}
                 </p>
                 <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                   {Object.entries(health.data!.checks).map(([k, ok]) => (
-                    <li key={k} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-[13px]">
+                    <li key={k} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm">
                       {ok ? <CheckCircle2 className="size-4 text-ok" /> : <XCircle className="size-4 text-bad" />}
                       {CHECK_LABELS[k] ?? k}
-                      <span className={ok ? 'ml-auto text-[12px] text-ok' : 'ml-auto text-[12px] text-bad'}>{ok ? 'Healthy' : 'Unavailable'}</span>
+                      <span className={ok ? 'ml-auto text-sm text-ok' : 'ml-auto text-sm text-bad'}>{ok ? 'Healthy' : 'Unavailable'}</span>
                     </li>
                   ))}
                 </ul>
@@ -57,10 +57,10 @@ export function SettingsPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <h2 className="flex items-center gap-2 text-base font-medium">
               <KeyRound className="size-4" /> API key
             </h2>
-            <p className="mt-1 text-[12.5px] text-muted">Stored in this browser only and sent as the X-API-Key header.</p>
+            <p className="mt-1 text-sm text-muted">Stored in this browser only and sent as the X-API-Key header.</p>
             <form
               className="mt-3 flex gap-2"
               onSubmit={(e) => {
@@ -86,7 +86,7 @@ export function SettingsPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-sm font-semibold">Appearance</h2>
+            <h2 className="text-base font-medium">Appearance</h2>
             <div className="mt-3">
               <Segmented<Theme>
                 label="Theme"
@@ -102,17 +102,18 @@ export function SettingsPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-sm font-semibold">The agent team</h2>
+            <h2 className="text-base font-medium">The agent team</h2>
             <ul className="mt-3 divide-y divide-line">
               {(Object.keys(NODE_META) as NodeName[]).map((n) => {
                 const { label, icon: Icon, description } = NODE_META[n]
                 return (
-                  <li key={n} className="flex items-center gap-3 py-2.5 text-[13px]">
+                  <li key={n} className="grid grid-cols-[28px_1fr] items-center gap-x-3 py-2.5 text-sm sm:grid-cols-[28px_9rem_1fr]">
                     <span className="grid size-7 place-items-center rounded-md bg-sunken">
-                      <Icon className="size-3.5 text-accent" />
+                      <Icon className="size-3.5 text-muted" />
                     </span>
-                    <span className="w-36 font-medium">{label}</span>
-                    <span className="text-muted">{description}</span>
+                    <span className="font-medium">{label}</span>
+                    {/* phones: description wraps under the name; sm+: its own column */}
+                    <span className="col-start-2 text-muted sm:col-start-auto">{description}</span>
                   </li>
                 )
               })}
