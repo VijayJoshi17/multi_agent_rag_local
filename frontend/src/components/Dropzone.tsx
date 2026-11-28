@@ -43,7 +43,7 @@ export function Dropzone({
     >
       <UploadCloud className={cn('mb-2 size-6', over ? 'text-accent' : 'text-muted')} />
       <p className="text-sm font-medium">{busy ? 'Uploading…' : 'Drop files here or click to browse'}</p>
-      <p className="mt-1 text-[12.5px] text-muted">{hint}</p>
+      <p className="mt-1 text-sm text-muted">{hint}</p>
       <input
         ref={input}
         type="file"

@@ -66,10 +66,9 @@ export function KnowledgePage() {
           }
         />
 
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:max-w-md">
           <Stat label="Documents" value={stats.data?.documents} />
           <Stat label="Indexed chunks" value={stats.data?.chunks} />
-          <Stat label="Formats" value="PDF · DOCX · PPTX · TXT · MD · ZIP" small />
         </div>
 
         <Dropzone
@@ -77,7 +76,7 @@ export function KnowledgePage() {
           multiple
           busy={upload.isPending}
           onFiles={(f) => upload.mutate(f)}
-          hint="ZIP archives are unpacked safely. Duplicate files are detected and skipped."
+          hint="PDF, DOCX, PPTX, TXT, Markdown or a ZIP of them · duplicates are skipped"
         />
 
         <Card className="mt-6 overflow-hidden">
@@ -90,8 +89,8 @@ export function KnowledgePage() {
               Upload files above, then ask questions about them in chat.
             </EmptyState>
           ) : (
-            <table className="w-full text-[13px]">
-              <thead className="border-b border-line bg-sunken/50 text-left text-[11.5px] uppercase tracking-wider text-muted">
+            <table className="w-full text-sm">
+              <thead className="border-b border-line bg-sunken/50 text-left text-sm text-muted">
                 <tr>
                   <th className="px-4 py-2 font-medium">Name</th>
                   <th className="hidden px-4 py-2 font-medium sm:table-cell">Size</th>
@@ -124,7 +123,7 @@ function DocRow({ d, onDelete }: { d: DocumentInfo; onDelete: () => void }) {
             {d.filename}
           </span>
         </div>
-        <div className="pl-6 text-[11.5px] text-faint">{timeAgo(d.created_at)}</div>
+        <div className="pl-6 text-xs text-faint">{timeAgo(d.created_at)}</div>
       </td>
       <td className="hidden px-4 py-2.5 text-muted tabular-nums sm:table-cell">{formatBytes(d.size_bytes)}</td>
       <td className="hidden px-4 py-2.5 text-muted tabular-nums sm:table-cell">{d.status === 'ready' ? d.chunk_count : '—'}</td>
@@ -139,7 +138,7 @@ function DocRow({ d, onDelete }: { d: DocumentInfo; onDelete: () => void }) {
           )}
           {s.label}
         </Badge>
-        {d.error && <p className="mt-1 max-w-[260px] text-[11.5px] text-bad">{d.error}</p>}
+        {d.error && <p className="mt-1 max-w-[260px] text-xs text-bad">{d.error}</p>}
       </td>
       <td className="px-2">
         <button
@@ -155,11 +154,11 @@ function DocRow({ d, onDelete }: { d: DocumentInfo; onDelete: () => void }) {
   )
 }
 
-function Stat({ label, value, small }: { label: string; value?: number | string; small?: boolean }) {
+function Stat({ label, value }: { label: string; value?: number }) {
   return (
-    <Card className="px-4 py-3">
-      <p className="text-[11.5px] uppercase tracking-wider text-muted">{label}</p>
-      <p className={small ? 'mt-1.5 text-[12.5px] font-medium' : 'mt-1 text-2xl font-semibold tabular-nums'}>{value ?? '—'}</p>
+    <Card className="px-5 py-4">
+      <p className="text-sm text-muted">{label}</p>
+      <p className="mt-2 text-2xl font-medium tabular-nums">{value?.toLocaleString() ?? '—'}</p>
     </Card>
   )
 }

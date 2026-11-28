@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowUp, BarChart3, FileText, Globe, Sparkles, Square } from 'lucide-react'
+import { ArrowUp, BarChart3, FileText, Globe, Signpost, Square } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import type { ChatMode } from '@/lib/types'
@@ -14,7 +14,7 @@ export interface ChatOptions {
 }
 
 const MODES = [
-  { value: 'auto' as const, label: 'Auto', icon: <Sparkles className="size-3.5" />, title: 'Router picks documents or web' },
+  { value: 'auto' as const, label: 'Auto', icon: <Signpost className="size-3.5" />, title: 'The router picks documents or the web' },
   { value: 'documents' as const, label: 'Docs', icon: <FileText className="size-3.5" />, title: 'Answer only from your knowledge base' },
   { value: 'web' as const, label: 'Web', icon: <Globe className="size-3.5" />, title: 'Search the live web' },
   { value: 'data' as const, label: 'Data', icon: <BarChart3 className="size-3.5" />, title: 'Analyze a CSV/Excel dataset' },
@@ -60,7 +60,7 @@ export function Composer({
   const set = <K extends keyof ChatOptions>(k: K, v: ChatOptions[K]) => onOptions({ ...options, [k]: v })
 
   return (
-    <div className="rounded-2xl border border-line bg-panel shadow-sm focus-within:border-accent/50 focus-within:ring-4 focus-within:ring-accent/10 transition-shadow">
+    <div className="rounded-2xl border border-line bg-panel shadow-sm focus-within:border-accent/60 transition-colors">
       <textarea
         ref={ref}
         value={text}
@@ -72,9 +72,9 @@ export function Composer({
             submit()
           }
         }}
-        placeholder={options.mode === 'data' ? 'Ask a question about your dataset…' : 'Ask anything about your documents or the web…'}
+        placeholder={options.mode === 'data' ? 'Ask about your dataset' : 'Ask a question'}
         aria-label="Message"
-        className="block w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-[15px] placeholder:text-faint focus:outline-none"
+        className="block w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-md placeholder:text-faint focus:outline-none"
         maxLength={4000}
       />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 pb-3">
@@ -83,7 +83,7 @@ export function Composer({
           <select
             value={options.dataset_id ?? ''}
             onChange={(e) => set('dataset_id', e.target.value || null)}
-            className="h-7 max-w-[200px] rounded-md border border-line bg-panel px-2 text-[12.5px] text-ink"
+            className="h-7 max-w-[200px] rounded-md border border-line bg-panel px-2 text-sm text-ink"
             aria-label="Dataset"
           >
             <option value="">Latest dataset</option>
@@ -96,7 +96,7 @@ export function Composer({
         ) : (
           <>
             <Switch checked={options.verify} onChange={(v) => set('verify', v)} label="Verify" />
-            <label className="inline-flex items-center gap-1.5 text-[12.5px] text-muted" title="Passages passed to the reasoner">
+            <label className="inline-flex items-center gap-1.5 text-sm text-muted" title="Passages passed to the reasoner">
               Top-k
               <input
                 type="number"

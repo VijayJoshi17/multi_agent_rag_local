@@ -61,7 +61,7 @@ export function AssistantMessage({ content, sources, meta, nodes, logs = [], cod
   return (
     <div className="group/msg">
       {/* Header: route + verification + timing */}
-      <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[12px]">
+      <div className="mb-2 flex flex-wrap items-center gap-1.5 text-sm">
         {streaming ? (
           <span className="inline-flex items-center gap-1.5 text-muted">
             <Spinner className="size-3.5 text-accent" />
@@ -101,7 +101,7 @@ export function AssistantMessage({ content, sources, meta, nodes, logs = [], cod
             <AgentGraph states={nodes} className="bg-sunken/40" />
           </Suspense>
           {(logs.length > 0 || allCode.length > 0 || meta?.query) && (
-            <div className="max-h-64 overflow-auto border-t border-line px-3 py-2 font-mono text-[11.5px] leading-relaxed">
+            <div className="max-h-64 overflow-auto border-t border-line px-3 py-2 font-mono text-xs leading-relaxed">
               {meta?.query && !logs.length && (
                 <div className="text-muted">
                   <span className="text-accent">query</span> {meta.query}
@@ -146,19 +146,19 @@ export function AssistantMessage({ content, sources, meta, nodes, logs = [], cod
       {streaming && content && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-accent align-middle" />}
 
       {error && (
-        <div className="mt-2 flex items-start gap-2 rounded-lg border border-bad/30 bg-bad-soft px-3 py-2 text-[13px] text-bad">
+        <div className="mt-2 flex items-start gap-2 rounded-lg border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           {error}
         </div>
       )}
 
       {!streaming && verdict === 'unsupported' && meta?.verification?.reason && (
-        <p className="mt-2 text-[12px] text-warn">Verifier: {meta.verification.reason}</p>
+        <p className="mt-2 text-sm text-warn">Verifier: {meta.verification.reason}</p>
       )}
 
       {/* Sources + actions */}
       {!streaming && (visibleSources.length > 0 || message) && (
-        <div className="mt-3 flex items-center gap-1 text-[12px] text-muted">
+        <div className="mt-3 flex items-center gap-1 text-sm text-muted">
           {visibleSources.length > 0 && (
             <button
               type="button"

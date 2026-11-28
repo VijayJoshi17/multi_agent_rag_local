@@ -35,9 +35,9 @@ const AgentNode = memo(function AgentNode({ data }: NodeProps<Node<AgentNodeData
   return (
     <div
       className={cn(
-        'flex w-[140px] items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] transition-all duration-300',
+        'flex w-[150px] items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors duration-300 ease-out',
         status === 'idle' && 'border-line bg-panel text-faint',
-        status === 'active' && 'border-accent bg-accent-soft text-accent-ink animate-pulse-ring',
+        status === 'active' && 'border-accent bg-accent-soft text-accent-ink',
         status === 'done' && 'border-ok/40 bg-ok-soft text-ink',
       )}
       title={data.state.summary ?? undefined}
@@ -46,7 +46,7 @@ const AgentNode = memo(function AgentNode({ data }: NodeProps<Node<AgentNodeData
       <Icon className={cn('size-3.5 shrink-0', status === 'done' && 'text-ok', status === 'active' && 'text-accent')} />
       <div className="min-w-0 leading-tight">
         <div className="truncate font-medium">{label}</div>
-        <div className="text-[10.5px] text-muted tabular-nums h-3.5">
+        <div className="text-xs text-muted tabular-nums h-3.5">
           {status === 'active' ? 'running…' : duration_ms != null ? formatMs(duration_ms) + (runs && runs > 1 ? ` · ×${runs}` : '') : ''}
         </div>
       </div>
