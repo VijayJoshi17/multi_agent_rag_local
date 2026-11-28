@@ -38,6 +38,9 @@ class RouterAgent(Agent):
         if mode in _MODE_ROUTES:
             await ctx.log(f"Mode '{mode}' selected explicitly.")
             return _MODE_ROUTES[mode]
+        if state.get("document_ids"):
+            await ctx.log("Specific documents selected → searching only those.")
+            return "retrieve"
 
         query = state["query"]
         if self.bm25.size == 0:

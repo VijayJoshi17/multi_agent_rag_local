@@ -18,6 +18,7 @@ export interface ChatRequest {
   top_k: number
   verify: boolean
   dataset_id?: string | null
+  document_ids?: string[] | null
 }
 
 export interface Source {
@@ -41,6 +42,11 @@ export interface TimelineEntry {
   summary: string | null
 }
 
+export interface AnalysisTable {
+  columns: string[]
+  rows: (string | number | boolean | null)[][]
+}
+
 export interface MessageMeta {
   trace_id?: string
   route?: 'retrieve' | 'web_search' | 'data_analyst'
@@ -49,7 +55,14 @@ export interface MessageMeta {
   verification?: Verification
   timeline?: TimelineEntry[]
   duration_ms?: number
-  analysis?: { code: string; ok: boolean; output: string; error: string | null; dataset_id: string }
+  analysis?: {
+    code: string
+    ok: boolean
+    output: string
+    error: string | null
+    dataset_id: string
+    table?: AnalysisTable | null
+  }
 }
 
 export interface Message {

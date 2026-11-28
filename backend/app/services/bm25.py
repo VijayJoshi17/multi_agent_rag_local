@@ -58,20 +58,25 @@ class BM25Index:
             self._chunks = chunks
             logger.info("BM25 index rebuilt with %d chunks", len(chunks))
 
-    def _search(self, query: str, k: int) -> list[Chunk]:
+    def _search(self, query: str, k: int, document_ids: list[str] | None) -> list[Chunk]:
         if self._bm25 is None:
             return []
         tokens = tokenize(query)
         if not tokens:
             return []
         scores = self._bm25.get_scores(tokens)
+        allowed = set(document_ids) if document_ids else None
         ranked = sorted(
-            ((i, s) for i, s in enumerate(scores) if s > 0), key=lambda x: x[1], reverse=True
+            ((i, s) for i, s in enumerate(scores)
+             if s > 0 and (allowed is None or self._chunks[i].document_id in allowed)),
+            key=lambda x: x[1], reverse=True,
         )[:k]
         return [self._chunks[i].model_copy(update={"score": float(s)}) for i, s in ranked]
 
-    async def search(self, query: str, k: int) -> list[Chunk]:
-        return await run_in_threadpool(self._search, query, k)
+    async def search(
+        self, query: str, k: int, document_ids: list[str] | None = None
+    ) -> list[Chunk]:
+        return await run_in_threadpool(self._search, query, k, document_ids)
 
     def clear(self) -> None:
         self._bm25, self._chunks = None, []

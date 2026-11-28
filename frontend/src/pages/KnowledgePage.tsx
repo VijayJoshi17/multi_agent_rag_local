@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, CheckCircle2, FileText, Library, Trash2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, FileText, Globe, Library, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { Dropzone } from '@/components/Dropzone'
 import { Badge, Button, Card, EmptyState, PageHeader, Spinner } from '@/components/ui'
@@ -32,6 +33,17 @@ export function KnowledgePage() {
       qc.invalidateQueries({ queryKey: ['documents'] })
     },
     onError: (e) => toast.error('Upload failed', { description: e.message }),
+  })
+  const [url, setUrl] = useState('')
+  const addUrl = useMutation({
+    mutationFn: api.addUrl,
+    onSuccess: (r) => {
+      if (r.documents.length) toast.success('Page added for indexing')
+      if (r.skipped.length) toast.warning('Already in the knowledge base', { description: r.skipped[0] })
+      setUrl('')
+      qc.invalidateQueries({ queryKey: ['documents'] })
+    },
+    onError: (e) => toast.error('Could not add the page', { description: e.message }),
   })
   const remove = useMutation({
     mutationFn: api.deleteDocument,
@@ -79,6 +91,29 @@ export function KnowledgePage() {
           hint="PDF, DOCX, PPTX, TXT, Markdown or a ZIP of them · duplicates are skipped"
         />
 
+        <form
+          className="mt-3 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (url.trim()) addUrl.mutate(url.trim())
+          }}
+        >
+          <label className="flex h-9 flex-1 items-center gap-2 rounded-lg border border-line bg-panel px-3 focus-within:border-accent/60">
+            <Globe className="size-4 shrink-0 text-faint" />
+            <span className="sr-only">Web page URL</span>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="Add a web page: https://…"
+              className="h-full flex-1 bg-transparent text-sm placeholder:text-faint focus:outline-none"
+            />
+          </label>
+          <Button type="submit" variant="secondary" loading={addUrl.isPending} disabled={!url.trim()}>
+            Add page
+          </Button>
+        </form>
+
         <Card className="mt-6 overflow-hidden">
           {docs.isLoading ? (
             <div className="grid place-items-center py-14">
@@ -118,7 +153,7 @@ function DocRow({ d, onDelete }: { d: DocumentInfo; onDelete: () => void }) {
     <tr className="group">
       <td className="max-w-0 px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <FileText className="size-4 shrink-0 text-muted" />
+          {d.content_type === 'url' ? <Globe className="size-4 shrink-0 text-muted" /> : <FileText className="size-4 shrink-0 text-muted" />}
           <span className="truncate font-medium" title={d.filename}>
             {d.filename}
           </span>

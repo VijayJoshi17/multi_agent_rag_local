@@ -10,7 +10,7 @@ import { useChatStream } from '@/hooks/useChatStream'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { api } from '@/lib/api'
 
-const DEFAULT_OPTIONS: ChatOptions = { mode: 'auto', verify: true, top_k: 5, dataset_id: null }
+const DEFAULT_OPTIONS: ChatOptions = { mode: 'auto', verify: true, top_k: 5, dataset_id: null, document_ids: [] }
 
 const EXAMPLES: { text: string; mode: ChatOptions['mode']; label: string }[] = [
   { text: 'Summarize the key points of my uploaded documents', mode: 'documents', label: 'docs' },
@@ -74,6 +74,7 @@ export function ChatPage() {
       top_k: options.top_k,
       verify: options.verify,
       dataset_id: options.mode === 'data' ? options.dataset_id : null,
+      document_ids: options.mode === 'auto' || options.mode === 'documents' ? options.document_ids : null,
     })
 
   const empty = !conversationId && !turn

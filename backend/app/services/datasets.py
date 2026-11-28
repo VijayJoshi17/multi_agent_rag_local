@@ -18,7 +18,13 @@ def _read_frame(ext: str, data: bytes | Path, nrows: int | None = None) -> pd.Da
     src = io.BytesIO(data) if isinstance(data, bytes) else data
     if ext == ".csv":
         return pd.read_csv(src, nrows=nrows)
-    return pd.read_excel(src, nrows=nrows)
+    return pd.read_excel(src, nrows=nrows)  # first sheet
+
+
+def _read_sheets(ext: str, data: bytes) -> dict[str, pd.DataFrame]:
+    if ext == ".csv":
+        return {"data": pd.read_csv(io.BytesIO(data))}
+    return pd.read_excel(io.BytesIO(data), sheet_name=None)
 
 
 class DatasetService:
@@ -36,13 +42,20 @@ class DatasetService:
         if ext not in parsing.DATASET_EXTS:
             raise UnsupportedFileError("Datasets must be .csv or .xlsx")
         try:
-            df = await run_in_threadpool(_read_frame, ext, data)
+            sheets = await run_in_threadpool(_read_sheets, ext, data)
         except Exception as e:  # noqa: BLE001
             raise UnsupportedFileError(f"Could not parse {filename}: {e}") from e
 
+        first = next(iter(sheets.values()))
+        multi = len(sheets) > 1
+        # One flat list (no schema change); "sheet" is set only for multi-sheet workbooks.
+        columns = [
+            {"name": str(c), "dtype": str(t), **({"sheet": str(name)} if multi else {})}
+            for name, frame in sheets.items() for c, t in frame.dtypes.items()
+        ]
         ds = Dataset(
-            filename=filename, stored_name="", size_bytes=len(data), row_count=len(df),
-            columns=[{"name": str(c), "dtype": str(t)} for c, t in df.dtypes.items()],
+            filename=filename, stored_name="", size_bytes=len(data), row_count=len(first),
+            columns=columns,
         )
         async with self.sessionmaker() as s:
             s.add(ds)

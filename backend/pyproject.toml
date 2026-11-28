@@ -28,6 +28,7 @@ dependencies = [
     "openpyxl>=3.1",
     "tabulate>=0.9",
     "ddgs>=9.0",
+    "trafilatura>=2.0",
     "yfinance>=0.2.50",
     "sqlalchemy[asyncio]>=2.0.30",
     "aiosqlite>=0.20",

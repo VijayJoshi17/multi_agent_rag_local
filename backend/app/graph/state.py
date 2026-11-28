@@ -18,6 +18,7 @@ class GraphState(TypedDict, total=False):
     top_k: int
     verify: bool
     dataset_id: str | None
+    document_ids: list[str] | None  # restrict retrieval to these documents
     # working state
     query: str
     route: Route
@@ -26,3 +27,4 @@ class GraphState(TypedDict, total=False):
     attempts: int
     verification: Verification
     analysis: dict[str, Any]
+    web_fallback: bool  # web search already ran after a document retrieval

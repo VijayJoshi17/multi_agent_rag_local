@@ -64,9 +64,14 @@ class VectorStore:
         for i in range(0, len(points), 256):
             await self.client.upsert(self.collection, points=points[i : i + 256], wait=True)
 
-    async def search(self, vector: list[float], limit: int) -> list[Chunk]:
+    async def search(
+        self, vector: list[float], limit: int, document_ids: list[str] | None = None
+    ) -> list[Chunk]:
+        flt = models.Filter(must=[models.FieldCondition(
+            key="document_id", match=models.MatchAny(any=document_ids)
+        )]) if document_ids else None
         res = await self.client.query_points(
-            self.collection, query=vector, limit=limit, with_payload=True
+            self.collection, query=vector, limit=limit, with_payload=True, query_filter=flt
         )
         return [Chunk.from_payload(p.payload or {}, score=p.score) for p in res.points]
 

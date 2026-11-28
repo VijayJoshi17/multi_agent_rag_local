@@ -13,6 +13,7 @@ import {
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import type { LogLine } from '@/hooks/useChatStream'
+import { chartFor } from '@/lib/chart'
 import type { Message, MessageMeta, NodeName, Source } from '@/lib/types'
 import { cn, formatMs } from '@/lib/utils'
 import { NODE_META, type NodeState } from '@/lib/agents'
@@ -21,6 +22,7 @@ import { SourceList } from './Sources'
 import { Badge, Spinner } from './ui'
 
 const AgentGraph = lazy(() => import('./AgentGraph').then((m) => ({ default: m.AgentGraph })))
+const DataChart = lazy(() => import('./DataChart'))
 
 const ROUTE_LABEL = { retrieve: 'Documents', web_search: 'Web', data_analyst: 'Data analysis' } as const
 
@@ -52,6 +54,7 @@ export function AssistantMessage({ content, sources, meta, nodes, logs = [], cod
   const verdict = meta?.verification?.verdict
   const allCode = code.length ? code : meta?.analysis?.code ? [{ code: meta.analysis.code, attempt: 1 }] : []
   const visibleSources = useMemo(() => sources.filter((s) => s.kind !== 'system'), [sources])
+  const chart = useMemo(() => chartFor(meta?.analysis?.table), [meta?.analysis?.table])
 
   const onCite = (n: number) => {
     setShowSources(true)
@@ -147,6 +150,12 @@ export function AssistantMessage({ content, sources, meta, nodes, logs = [], cod
         </div>
       ) : null}
       {streaming && content && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-accent align-middle" />}
+
+      {chart && !streaming && (
+        <Suspense fallback={<div className="mt-4 h-72" />}>
+          <DataChart spec={chart} />
+        </Suspense>
+      )}
 
       {error && (
         <div className="mt-2 flex items-start gap-2 rounded-lg border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad">

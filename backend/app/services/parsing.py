@@ -92,7 +92,7 @@ def expand_zip(
 
 
 def extract_text(ext: str, data: bytes) -> list[PageText]:
-    if ext in {".txt", ".md"}:
+    if ext in {".txt", ".md", ".url"}:  # .url = text already extracted from a web page
         return [PageText(data.decode("utf-8", errors="replace"))]
     if ext == ".pdf":
         import pypdf

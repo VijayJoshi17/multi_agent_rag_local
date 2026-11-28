@@ -31,6 +31,7 @@ class Chunk(BaseModel):
             "document_id": self.document_id,
             "chunk_index": self.chunk_index,
             "page": self.page,
+            "url": self.url,
         }
 
     @classmethod
@@ -41,5 +42,6 @@ class Chunk(BaseModel):
             document_id=payload.get("document_id"),
             chunk_index=payload.get("chunk_index", 0),
             page=payload.get("page"),
+            url=payload.get("url"),
             score=score,
         )

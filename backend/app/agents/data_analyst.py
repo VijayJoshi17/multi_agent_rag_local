@@ -13,6 +13,18 @@ from app.services.sandbox import SandboxClient
 _CODE_RE = re.compile(r"```(?:python)?\s*\n(.*?)```", re.DOTALL)
 
 
+def describe_columns(columns: list[dict[str, str]]) -> str:
+    """Column list for the prompt; multi-sheet workbooks are grouped per sheet."""
+    sheets = list(dict.fromkeys(c["sheet"] for c in columns if "sheet" in c))
+    if not sheets:
+        return "\n".join(f"- {c['name']} ({c['dtype']})" for c in columns)
+    return "\n".join(
+        f"sheets[{name!r}]" + (" (also `df`)" if i == 0 else "") + ":\n"
+        + "\n".join(f"  - {c['name']} ({c['dtype']})" for c in columns if c.get("sheet") == name)
+        for i, name in enumerate(sheets)
+    )
+
+
 def extract_code(text: str) -> str:
     match = _CODE_RE.search(text)
     return (match.group(1) if match else text).strip()
@@ -35,7 +47,7 @@ class DataAnalystAgent(Agent):
             await ctx.log(str(e))
             return {"evidence": [Chunk(text=str(e), source="system", kind="system")]}
 
-        schema = "\n".join(f"- {c['name']} ({c['dtype']})" for c in ds.columns)
+        schema = describe_columns(ds.columns)
         sample = await self.datasets.sample(ds)
         await ctx.log(f"Dataset: {ds.filename} ({ds.row_count:,} rows, {len(ds.columns)} cols)")
 
@@ -70,7 +82,7 @@ class DataAnalystAgent(Agent):
         return {
             "evidence": [chunk],
             "analysis": {"code": code, "ok": result.ok, "output": result.output,
-                         "error": result.error, "dataset_id": ds.id},
+                         "error": result.error, "dataset_id": ds.id, "table": result.table},
         }
 
     @staticmethod

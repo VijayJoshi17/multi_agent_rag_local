@@ -7,7 +7,7 @@ from app.container import Container
 from app.core.config import get_settings
 from app.core.errors import AppError, NotFoundError
 from app.db.models import Document, DocumentStatus
-from app.schemas.api import DocumentOut, KnowledgeBaseStats, UploadResult
+from app.schemas.api import DocumentOut, KnowledgeBaseStats, UploadResult, UrlIn
 
 router = APIRouter(tags=["knowledge-base"])
 
@@ -34,6 +34,18 @@ async def upload_documents(
             continue
         created.extend(docs)
         skipped.extend(skip)
+    return UploadResult(
+        documents=[DocumentOut.model_validate(d) for d in created], skipped=skipped
+    )
+
+
+@router.post("/documents/url", response_model=UploadResult, status_code=202)
+@limiter.limit(lambda: get_settings().RATE_LIMIT_UPLOAD)
+async def add_url(
+    request: Request, body: UrlIn, c: Container = Depends(get_container)
+) -> UploadResult:
+    """Fetch a public web page and add its readable text to the knowledge base."""
+    created, skipped = await c.ingestion.register_url(body.url)
     return UploadResult(
         documents=[DocumentOut.model_validate(d) for d in created], skipped=skipped
     )

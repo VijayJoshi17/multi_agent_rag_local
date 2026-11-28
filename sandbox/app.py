@@ -33,6 +33,7 @@ class ExecuteResponse(BaseModel):
     output: str = ""
     error: str | None = None
     duration_ms: int = 0
+    table: dict | None = None  # {"columns": [...], "rows": [[...]]} for charting
 
 
 def _limits(cpu_s: int):  # noqa: ANN202

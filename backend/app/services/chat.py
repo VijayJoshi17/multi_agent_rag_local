@@ -76,6 +76,7 @@ class ChatService:
             initial: GraphState = {
                 "question": req.message, "history": history, "mode": req.mode,
                 "top_k": req.top_k, "verify": req.verify, "dataset_id": req.dataset_id,
+                "document_ids": req.document_ids,
                 "attempts": 0,
             }
 

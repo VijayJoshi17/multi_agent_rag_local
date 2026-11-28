@@ -61,8 +61,13 @@ def build_workflow(agents: Agents, max_verify_retries: int):
     g.add_conditional_edges("router", lambda s: s["route"],
                             ["retrieve", "web_search", "data_analyst"])
 
+    def can_try_web(s: GraphState) -> bool:
+        """Auto mode, unscoped, and the web hasn't been tried yet for this question."""
+        return (s.get("mode", "auto") == "auto" and not s.get("document_ids")
+                and not s.get("web_fallback"))
+
     def after_retrieve(s: GraphState) -> str:
-        if not s.get("evidence") and s.get("mode", "auto") == "auto":
+        if not s.get("evidence") and can_try_web(s):
             return "web_search"  # nothing relevant locally -> fall back to the web
         return "reason"
 
@@ -74,12 +79,15 @@ def build_workflow(agents: Agents, max_verify_retries: int):
         evidence = s.get("evidence") or []
         grounded = [c for c in evidence if c.kind != "system"]
         if is_refusal(s.get("answer", "")):
+            # The documents didn't answer it: try the web once, keeping the document passages.
+            if s.get("route") == "retrieve" and can_try_web(s):
+                return "web_search"
             return END  # nothing to fact-check in "not found"
         if s.get("verify", True) and grounded and s.get("route") != "data_analyst":
             return "verify"
         return END
 
-    g.add_conditional_edges("reason", after_reason, ["verify", END])
+    g.add_conditional_edges("reason", after_reason, ["verify", "web_search", END])
 
     def after_verify(s: GraphState) -> str:
         v = s.get("verification") or {}

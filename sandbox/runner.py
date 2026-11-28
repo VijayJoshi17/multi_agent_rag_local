@@ -93,21 +93,55 @@ def render(result: object, pd) -> str:  # noqa: ANN001
     return text[:8000]
 
 
+def to_table(result: object, pd, max_rows: int = 200) -> dict | None:  # noqa: ANN001
+    """JSON-safe copy of a DataFrame/Series result, so the UI can chart it."""
+    if isinstance(result, pd.Series):
+        result = result.to_frame(name=str(result.name) if result.name is not None else "value")
+    if not isinstance(result, pd.DataFrame) or result.empty:
+        return None
+    frame = result.head(max_rows)
+    if not isinstance(frame.index, pd.RangeIndex):  # group labels live in the index
+        frame = frame.reset_index()
+    frame.columns = [" / ".join(map(str, c)) if isinstance(c, tuple) else str(c)
+                     for c in frame.columns]
+
+    def cell(v):  # noqa: ANN001, ANN202
+        if v is None or (isinstance(v, float) and v != v):  # NaN
+            return None
+        if hasattr(v, "item"):  # numpy scalar
+            v = v.item()
+        return v if isinstance(v, (int, float, bool, str)) else str(v)
+
+    return {"columns": list(frame.columns),
+            "rows": [[cell(v) for v in row] for row in frame.itertuples(index=False)]}
+
+
+def load(dataset_path: str, pd) -> tuple[object, dict]:  # noqa: ANN001
+    """df is the first sheet; sheets maps every sheet name to its frame (CSV: one sheet)."""
+    if dataset_path.endswith(".csv"):
+        df = pd.read_csv(dataset_path)
+        return df, {"data": df}
+    sheets = pd.read_excel(dataset_path, sheet_name=None)
+    return next(iter(sheets.values())), sheets
+
+
 def run(code: str, dataset_path: str) -> dict:
     import numpy as np
     import pandas as pd
 
     tree = validate(code)
-    df = pd.read_csv(dataset_path) if dataset_path.endswith(".csv") else pd.read_excel(dataset_path)
+    df, sheets = load(dataset_path, pd)
 
     safe_builtins = dict(SAFE_BUILTINS, __import__=_restricted_import)
-    scope = {"__builtins__": safe_builtins, "df": df, "pd": pd, "np": np}
+    scope = {"__builtins__": safe_builtins, "df": df, "sheets": sheets, "pd": pd, "np": np}
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout):
         exec(compile(tree, "<analysis>", "exec"), scope)  # noqa: S102 - validated + isolated
 
     printed = stdout.getvalue().strip()
+    table = None
     if "result" in scope:
+        table = to_table(scope["result"], pd)
         output = render(scope["result"], pd)
         if printed:
             output = f"{output}\n\nPrinted output:\n{printed[:4000]}"
@@ -115,7 +149,7 @@ def run(code: str, dataset_path: str) -> dict:
         output = printed[:8000]
     else:
         raise ValidationError("Code did not assign a `result` variable")
-    return {"ok": True, "output": output, "error": None}
+    return {"ok": True, "output": output, "error": None, "table": table}
 
 
 def main() -> None:

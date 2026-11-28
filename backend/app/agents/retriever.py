@@ -37,16 +37,17 @@ class RetrieverAgent(Agent):
     async def retrieve(
         self, query: str, top_k: int, *, dense: bool = True, sparse: bool = True,
         rerank: bool = True, rerank_candidates: int | None = None,
+        document_ids: list[str] | None = None,
     ) -> tuple[list[Chunk], list[str]]:
         """The retrieval pipeline. Flags exist so the evaluation harness can ablate stages."""
         notes: list[str] = []
         lists, weights = [], []
         if dense:
             vec = await self.embedder.embed_query(query)
-            lists.append(await self.store.search(vec, limit=self.pool))
+            lists.append(await self.store.search(vec, limit=self.pool, document_ids=document_ids))
             weights.append(1.0)
         if sparse:
-            lists.append(await self.bm25.search(query, k=self.pool))
+            lists.append(await self.bm25.search(query, k=self.pool, document_ids=document_ids))
             weights.append(1.0)
         notes.append(" · ".join(
             f"{name}: {len(r)} candidates"
@@ -71,7 +72,11 @@ class RetrieverAgent(Agent):
         return fused[:top_k], notes
 
     async def __call__(self, state: GraphState, ctx: NodeContext) -> dict[str, Any]:
-        evidence, notes = await self.retrieve(state["query"], state.get("top_k", 5))
+        doc_ids = state.get("document_ids")
+        if doc_ids:
+            await ctx.log(f"Scoped to {len(doc_ids)} selected document(s).")
+        evidence, notes = await self.retrieve(state["query"], state.get("top_k", 5),
+                                              document_ids=doc_ids)
         for note in notes:
             await ctx.log(note)
         if not evidence:

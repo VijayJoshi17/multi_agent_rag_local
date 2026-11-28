@@ -82,3 +82,38 @@ def test_execute_timeout(client):
 @pytest.mark.parametrize("name", ["../secrets.csv", "x.csv", "0123456789abcdef0123456789abcdef.py"])
 def test_rejects_bad_dataset_names(client, name):
     assert client.post("/execute", json={"code": "result=1", "dataset": name}).status_code == 400
+
+
+def test_execute_returns_chartable_table(client):
+    body = client.post("/execute", json={
+        "code": "result = df.groupby('region')['revenue'].sum()", "dataset": DATASET,
+    }).json()
+    assert body["ok"] is True
+    assert body["table"] == {"columns": ["region", "revenue"], "rows": [["EU", 10], ["US", 5]]}
+
+
+def test_scalar_result_has_no_table(client):
+    body = client.post("/execute", json={"code": "result = len(df)", "dataset": DATASET}).json()
+    assert body["ok"] is True and body["table"] is None
+
+
+def test_excel_sheets_are_available(tmp_path, monkeypatch):
+    import importlib
+
+    import pandas as pd
+
+    name = "abcdefabcdefabcdefabcdefabcdef12.xlsx"
+    with pd.ExcelWriter(tmp_path / name) as xw:
+        pd.DataFrame({"a": [1, 2]}).to_excel(xw, sheet_name="first", index=False)
+        pd.DataFrame({"b": [10, 20, 30]}).to_excel(xw, sheet_name="second", index=False)
+    monkeypatch.setenv("DATASETS_DIR", str(tmp_path))
+    import app as sandbox_app
+
+    importlib.reload(sandbox_app)
+    from fastapi.testclient import TestClient
+
+    body = TestClient(sandbox_app.app).post("/execute", json={
+        "code": "result = int(df['a'].sum() + sheets['second']['b'].sum())", "dataset": name,
+    }).json()
+    assert body["ok"] is True, body
+    assert body["output"] == "63"
