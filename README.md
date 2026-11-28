@@ -96,10 +96,20 @@ docker compose exec ollama ollama pull llama3.1:8b
 
 ### Choosing a model
 
-Any OpenRouter model id works (`LLM_MODEL=...`). Free models end in `:free` ([list](https://openrouter.ai/models?max_price=0)). Good choices:
+Any OpenRouter model id works (`LLM_MODEL=...`). The default is `nvidia/nemotron-3.5-super-vl:free`.
 
-- `meta-llama/llama-3.3-70b-instruct:free` (default): strong instruction following and citations.
-- `deepseek/deepseek-chat-v3-0324:free`: strong at the Data Analyst's code generation.
+OpenRouter's free models change often: a model can lose its free tier or be rate-limited by its
+provider at any time. To see which are free right now:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models | python -c "import json,sys; [print(m['id']) for m in json.load(sys.stdin)['data'] if m['id'].endswith(':free')]"
+```
+
+Or set `LLM_MODEL=openrouter/free` to let OpenRouter pick any available free model (convenient, but
+answers vary with the model it picks). Reasoning models work: no agent sets an output-token cap
+that their hidden reasoning could exhaust.
+
+Free accounts have a daily request limit; a typical question costs 2 requests (answer + verify).
 
 Free tiers are rate-limited, so the pipeline is designed to keep LLM calls low. Contextualize and Router are skipped when not needed, Web Search plans the query and detects tickers in a single call, and the Reasoner writes the final formatting directly. A typical question costs **2 calls** (answer + verify).
 

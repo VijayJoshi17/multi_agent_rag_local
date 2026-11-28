@@ -35,8 +35,9 @@ class VerifierAgent(Agent):
             f"SOURCES:\n{format_evidence(state.get('evidence') or [])}\n\n"
             f"QUESTION:\n{state['query']}\n\nANSWER TO CHECK:\n{state.get('answer', '')}"
         )
+        # No max_tokens: reasoning models spend hidden tokens first, so a cap can empty the answer.
         raw = await self.llm.complete(prompt, system=load_prompt("verifier"), json_mode=True,
-                                      max_tokens=250, temperature=0)
+                                      temperature=0)
         verification = parse_verdict(raw)
         VERIFICATION_COUNTER.labels(verdict=verification["verdict"]).inc()
         await ctx.log(f"Verdict: {verification['verdict']} — {verification['reason']}")

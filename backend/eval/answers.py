@@ -85,7 +85,7 @@ async def judge(llm: LLMClient, q: Question, answer: str) -> tuple[bool, str]:
     for attempt in range(3):
         try:
             raw = await llm.complete(prompt, system=JUDGE_PROMPT, json_mode=True,
-                                     temperature=0, max_tokens=150)
+                                     temperature=0)
             data = parse_json(raw)
             if isinstance(data.get("correct"), bool):
                 return data["correct"], str(data.get("reason", ""))
@@ -105,17 +105,30 @@ async def ask(c: Any, q: Question, mode: str, verify: bool) -> dict[str, Any]:
     return {"final": final, "error": error}
 
 
+def results_path(args: argparse.Namespace, model: str, ext: str) -> Path:
+    slug = args.name or re.sub(r"[^a-z0-9.]+", "-", model.lower()).strip("-")
+    return RESULTS_DIR / f"answers-{slug}.{ext}"
+
+
 async def run(args: argparse.Namespace) -> dict[str, Any]:
     questions = load_questions()
-    selected = [q for q in questions if not args.ids or q.id in args.ids][: args.limit or None]
     base = get_settings()
+    order = {q.id: i for i, q in enumerate(questions)}
+    rows: list[dict[str, Any]] = []
+    prev = results_path(args, base.LLM_MODEL, "json")
+    if args.resume and prev.exists():
+        # Keep answered questions; retry only the ones that are missing or errored.
+        rows = [r for r in json.loads(prev.read_text(encoding="utf-8"))["rows"] if not r["error"]]
+        print(f"Resuming: {len(rows)} answered, running the rest", flush=True)
+    done = {r["id"] for r in rows}
+    selected = [q for q in questions if (not args.ids or q.id in args.ids) and q.id not in done]
+    selected = selected[: args.limit or None]
     real_llm = OpenAICompatibleLLM(base)
     llm = CountingLLM(real_llm)
     judge_llm: LLMClient = real_llm
     if args.judge_model:
         judge_llm = OpenAICompatibleLLM(base.model_copy(update={"LLM_MODEL": args.judge_model}))
 
-    rows: list[dict[str, Any]] = []
     with temp_dir() as tmp:
         settings: Settings = eval_settings(Path(tmp), base, RERANKER_ENABLED=True)
         c = await build_pipeline(settings, llm=llm)  # type: ignore[arg-type]
@@ -130,6 +143,10 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                     llm.calls = 0
                     start = time.perf_counter()
                     result = await ask(c, q, args.mode, not args.no_verify)
+                if result["error"] and "per-day" in result["error"]:
+                    print(f"Daily request limit reached at {q.id}; stopping. "
+                          "Re-run with --resume to continue.", flush=True)
+                    break
                 elapsed = time.perf_counter() - start
                 final = result["final"] or {}
                 answer = final.get("content", "")
@@ -165,7 +182,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         "model": base.LLM_MODEL, "judge_model": args.judge_model or base.LLM_MODEL,
         "provider": base.LLM_BASE_URL, "mode": args.mode, "verify": not args.no_verify,
         "distractors": not args.no_distractors, "corpus_chunks": chunks,
-        "summary": summarize(rows), "rows": rows,
+        "summary": summarize(rows), "rows": sorted(rows, key=lambda r: order[r["id"]]),
     }
 
 
@@ -258,17 +275,17 @@ def main() -> None:
     p.add_argument("--no-distractors", action="store_true")
     p.add_argument("--judge-model", default="")
     p.add_argument("--name", default="", help="results file suffix (default: model name)")
+    p.add_argument("--resume", action="store_true",
+                   help="keep answered questions from the last run, run only the rest")
     args = p.parse_args()
 
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
     report = asyncio.run(run(args))
-    slug = args.name or re.sub(r"[^a-z0-9.]+", "-", report["model"].lower()).strip("-")
     RESULTS_DIR.mkdir(exist_ok=True)
-    (RESULTS_DIR / f"answers-{slug}.json").write_text(json.dumps(report, indent=2,
-                                                                 ensure_ascii=False),
-                                                      encoding="utf-8")
+    results_path(args, report["model"], "json").write_text(
+        json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     md = to_markdown(report)
-    (RESULTS_DIR / f"answers-{slug}.md").write_text(md, encoding="utf-8")
+    results_path(args, report["model"], "md").write_text(md, encoding="utf-8")
     print("\n" + md)
 
 

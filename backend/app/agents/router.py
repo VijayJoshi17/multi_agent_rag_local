@@ -62,7 +62,7 @@ class RouterAgent(Agent):
 
         await ctx.log("Ambiguous signals — asking the LLM to classify.")
         verdict = await self.llm.complete(f"Query: {query}\nLabel:",
-                                          system=load_prompt("router"), max_tokens=5,
+                                          system=load_prompt("router"),
                                           temperature=0)
         return "web_search" if "external" in verdict.lower() else "retrieve"
 

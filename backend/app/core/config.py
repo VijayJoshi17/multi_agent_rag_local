@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # --- LLM (any OpenAI-compatible endpoint: OpenRouter, Ollama /v1, ...) ---
     LLM_BASE_URL: str = "https://openrouter.ai/api/v1"
     LLM_API_KEY: SecretStr = SecretStr("")
-    LLM_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
+    LLM_MODEL: str = "nvidia/nemotron-3.5-super-vl:free"
     LLM_TEMPERATURE: float = 0.1
     LLM_TIMEOUT_S: float = 90.0
     LLM_MAX_RETRIES: int = 2
