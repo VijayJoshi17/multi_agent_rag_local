@@ -187,3 +187,7 @@ docker-compose.yml
 - Qdrant sparse vectors in place of the in-memory BM25 index for very large corpora
 - An offline RAG evaluation set (retrieval recall, groundedness) run in CI
 - OCR for scanned PDFs
+
+## License
+
+[MIT](LICENSE) © 2026 Vijay Joshi

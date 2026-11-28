@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agentic-rag-backend"
 version = "1.0.0"
+license = "MIT"
 description = "Multi-agent RAG backend: LangGraph orchestration, hybrid retrieval, sandboxed data analysis."
 requires-python = ">=3.11"
 dependencies = [
