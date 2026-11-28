@@ -26,8 +26,8 @@ class ContextualizerAgent(Agent):
             f"CHAT HISTORY:\n{format_history(history, self.history_turns)}\n\n"
             f"LATEST USER QUESTION:\n{question}\n\nSTANDALONE QUESTION:"
         )
-        rewritten = (await self.llm.complete(prompt, system=load_prompt("contextualizer"),
-                                             max_tokens=200)).strip().strip('"')
+        raw = await self.llm.complete(prompt, system=load_prompt("contextualizer"))
+        rewritten = raw.strip().strip('"')
         # Guard against the model answering instead of rewriting.
         if not rewritten or len(rewritten) > max(400, len(question) * 4):
             rewritten = question

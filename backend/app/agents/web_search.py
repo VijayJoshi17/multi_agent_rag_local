@@ -52,7 +52,7 @@ class WebSearchAgent(Agent):
 
     async def _plan(self, query: str) -> tuple[str, str | None]:
         raw = await self.llm.complete(f"User question: {query}", system=load_prompt("web_plan"),
-                                      json_mode=True, max_tokens=120, temperature=0)
+                                      json_mode=True, temperature=0)
         plan = parse_json(raw)
         search = str(plan.get("search_query") or query).strip().strip('"') or query
         ticker = plan.get("ticker")
