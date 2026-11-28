@@ -107,12 +107,13 @@ export function SettingsPage() {
               {(Object.keys(NODE_META) as NodeName[]).map((n) => {
                 const { label, icon: Icon, description } = NODE_META[n]
                 return (
-                  <li key={n} className="flex items-center gap-3 py-2.5 text-sm">
+                  <li key={n} className="grid grid-cols-[28px_1fr] items-center gap-x-3 py-2.5 text-sm sm:grid-cols-[28px_9rem_1fr]">
                     <span className="grid size-7 place-items-center rounded-md bg-sunken">
-                      <Icon className="size-3.5 text-accent" />
+                      <Icon className="size-3.5 text-muted" />
                     </span>
-                    <span className="w-36 font-medium">{label}</span>
-                    <span className="text-muted">{description}</span>
+                    <span className="font-medium">{label}</span>
+                    {/* phones: description wraps under the name; sm+: its own column */}
+                    <span className="col-start-2 text-muted sm:col-start-auto">{description}</span>
                   </li>
                 )
               })}

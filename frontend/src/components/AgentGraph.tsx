@@ -6,13 +6,14 @@ import type { NodeName } from '@/lib/types'
 import { cn, formatMs } from '@/lib/utils'
 
 const POSITIONS: Record<NodeName, { x: number; y: number }> = {
-  contextualize: { x: 0, y: 70 },
-  router: { x: 170, y: 70 },
-  retrieve: { x: 340, y: 0 },
-  web_search: { x: 340, y: 70 },
-  data_analyst: { x: 340, y: 140 },
-  reason: { x: 510, y: 70 },
-  verify: { x: 680, y: 70 },
+  // Compact so fitView renders near 1:1 in the 768px chat column (labels stay >= 11px).
+  contextualize: { x: 0, y: 64 },
+  router: { x: 150, y: 64 },
+  retrieve: { x: 300, y: 0 },
+  web_search: { x: 300, y: 64 },
+  data_analyst: { x: 300, y: 128 },
+  reason: { x: 450, y: 64 },
+  verify: { x: 600, y: 64 },
 }
 
 const EDGES: [NodeName, NodeName][] = [
@@ -35,7 +36,7 @@ const AgentNode = memo(function AgentNode({ data }: NodeProps<Node<AgentNodeData
   return (
     <div
       className={cn(
-        'flex w-[150px] items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors duration-300 ease-out',
+        'flex w-[140px] items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors duration-300 ease-out',
         status === 'idle' && 'border-line bg-panel text-faint',
         status === 'active' && 'border-accent bg-accent-soft text-accent-ink',
         status === 'done' && 'border-ok/40 bg-ok-soft text-ink',
@@ -88,7 +89,7 @@ export function AgentGraph({ states, className }: { states: Partial<Record<NodeN
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.08 }}
+        fitViewOptions={{ padding: 0.02 }}
         nodesConnectable={false}
         panOnDrag={false}
         zoomOnScroll={false}

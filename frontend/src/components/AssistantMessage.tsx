@@ -97,11 +97,14 @@ export function AssistantMessage({ content, sources, meta, nodes, logs = [], cod
 
       {showDetails && (
         <div className="mb-3 overflow-hidden rounded-xl border border-line bg-panel">
-          <Suspense fallback={<div className="h-[200px]" />}>
-            <AgentGraph states={nodes} className="bg-sunken/40" />
-          </Suspense>
+          {/* Below lg the chat column is too narrow for legible node labels (<11px); the timeline below shows the same steps */}
+          <div className="hidden lg:block">
+            <Suspense fallback={<div className="h-[200px]" />}>
+              <AgentGraph states={nodes} className="bg-sunken/40" />
+            </Suspense>
+          </div>
           {(logs.length > 0 || allCode.length > 0 || meta?.query) && (
-            <div className="max-h-64 overflow-auto border-t border-line px-3 py-2 font-mono text-xs leading-relaxed">
+            <div className="max-h-64 overflow-auto border-line px-3 py-2 font-mono lg:border-t text-xs leading-relaxed">
               {meta?.query && !logs.length && (
                 <div className="text-muted">
                   <span className="text-accent">query</span> {meta.query}
