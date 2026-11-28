@@ -32,8 +32,11 @@ class ReasonerAgent(Agent):
         attempts = state.get("attempts", 0) + 1
 
         if attempts > 1:
-            await ctx.event({"type": "answer_reset", "reason": "verification_failed"})
-            await ctx.log("Regenerating answer using verifier feedback.")
+            retry_web = state.get("web_fallback") and not state.get("verification")
+            await ctx.event({"type": "answer_reset",
+                             "reason": "web_fallback" if retry_web else "verification_failed"})
+            await ctx.log("Documents didn't answer it; answering again with web results."
+                          if retry_web else "Regenerating answer using verifier feedback.")
 
         if not evidence or all(c.kind == "system" for c in evidence):
             text = evidence[0].text if evidence else NO_EVIDENCE_ANSWER

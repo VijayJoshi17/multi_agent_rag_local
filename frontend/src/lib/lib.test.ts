@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { reduceTurn, type LiveTurn } from '@/hooks/useChatStream'
 import { parseSSE } from './api'
+import { chartFor } from './chart'
 import { formatBytes, linkCitations } from './utils'
 
 describe('parseSSE', () => {
@@ -56,5 +57,22 @@ describe('formatBytes', () => {
     expect(formatBytes(512)).toBe('512 B')
     expect(formatBytes(1536)).toBe('1.5 KB')
     expect(formatBytes(25 * 1024 * 1024)).toBe('25 MB')
+  })
+})
+
+describe('chartFor', () => {
+  it('bars for categories, accent series = first numeric column', () => {
+    const spec = chartFor({ columns: ['region', 'revenue'], rows: [['US', 137.5], ['EU', 65], ['APAC', 7.5]] })
+    expect(spec).toMatchObject({ kind: 'bar', x: 'region', series: ['revenue'] })
+    expect(spec?.data[0]).toEqual({ region: 'US', revenue: 137.5 })
+  })
+  it('lines for dates or increasing numeric x', () => {
+    expect(chartFor({ columns: ['month', 'sales'], rows: [['2025-01', 3], ['2025-02', 5]] })?.kind).toBe('line')
+    expect(chartFor({ columns: ['year', 'sales'], rows: [[2023, 3], [2024, 5]] })?.kind).toBe('line')
+  })
+  it('no chart for a single row, no numbers, or missing table', () => {
+    expect(chartFor({ columns: ['a', 'b'], rows: [['x', 1]] })).toBeNull()
+    expect(chartFor({ columns: ['a', 'b'], rows: [['x', 'y'], ['z', 'w']] })).toBeNull()
+    expect(chartFor(null)).toBeNull()
   })
 })

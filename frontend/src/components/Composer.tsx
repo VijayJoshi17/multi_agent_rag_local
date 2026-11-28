@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import type { ChatMode } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { DocumentPicker } from './DocumentPicker'
 import { Segmented, Switch } from './ui'
 
 export interface ChatOptions {
@@ -11,6 +12,7 @@ export interface ChatOptions {
   verify: boolean
   top_k: number
   dataset_id: string | null
+  document_ids: string[]
 }
 
 const MODES = [
@@ -95,6 +97,9 @@ export function Composer({
           </select>
         ) : (
           <>
+            {options.mode !== 'web' && (
+              <DocumentPicker value={options.document_ids ?? []} onChange={(ids) => set('document_ids', ids)} />
+            )}
             <Switch checked={options.verify} onChange={(v) => set('verify', v)} label="Verify" />
             <label className="inline-flex items-center gap-1.5 text-sm text-muted" title="Passages passed to the reasoner">
               Top-k

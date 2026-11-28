@@ -20,6 +20,7 @@ class ChatRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20)
     verify: bool = True
     dataset_id: str | None = None
+    document_ids: list[str] | None = Field(default=None, max_length=100)
 
 
 class SourceOut(BaseModel):
@@ -77,6 +78,10 @@ class DocumentOut(BaseModel):
     error: str | None
     created_at: UTCDateTime
     updated_at: UTCDateTime
+
+
+class UrlIn(BaseModel):
+    url: str = Field(min_length=8, max_length=2000)
 
 
 class UploadResult(BaseModel):

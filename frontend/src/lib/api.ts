@@ -95,6 +95,7 @@ export const api = {
     files.forEach((f) => form.append('files', f))
     return request<UploadResult>('/documents', { method: 'POST', body: form })
   },
+  addUrl: (url: string) => request<UploadResult>('/documents/url', json('POST', { url })),
   deleteDocument: (id: string) => request<void>(`/documents/${id}`, { method: 'DELETE' }),
   kbStats: () => request<KnowledgeBaseStats>('/knowledge-base/stats'),
   resetKnowledgeBase: () => request<void>('/knowledge-base', { method: 'DELETE' }),

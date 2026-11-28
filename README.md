@@ -14,7 +14,10 @@ A multi-agent **Retrieval-Augmented Generation** system: a team of specialised a
 - **Self-correcting answers:** an LLM-as-judge Verifier checks every claim against the sources. When it rejects an answer, the Reasoner regenerates it using the verifier's feedback.
 - **Inline citations:** answers cite `[1]`, `[2]`… and each citation opens the exact passage (with page number for PDFs).
 - **Live agent trace:** every agent's start, finish, logs and timing stream to the UI over Server-Sent Events, rendered as an animated graph. Answers stream token by token.
-- **Sandboxed data analysis:** the Data Analyst writes pandas code and runs it in an isolated container (no network, read-only filesystem, CPU/memory/time limits). If the code fails, the error goes back to the LLM for a self-repair attempt.
+- **Sandboxed data analysis:** the Data Analyst writes pandas code and runs it in an isolated container (no network, read-only filesystem, CPU/memory/time limits). If the code fails, the error goes back to the LLM for a self-repair attempt. Results come with a chart (bar or line, picked from the shape of the data), and multi-sheet Excel workbooks are supported.
+- **Web pages read in full:** web answers come from the most relevant passages of the top result pages, not just search snippets.
+- **Your own web pages:** add any public page to the knowledge base by URL, and scope questions to selected documents.
+- **Documents, then the web:** in Auto mode, when your documents don't contain the answer, the system searches the web once and answers from both, citing each source type.
 - **Smart routing:** cheap retrieval signals decide documents vs. web first. The LLM is consulted only for ambiguous queries.
 - **Provider-agnostic LLM:** any OpenAI-compatible endpoint works (OpenRouter, Ollama, vLLM, OpenAI), switched with one environment variable.
 - **Production basics:** API-key auth, rate limiting, upload validation (magic bytes, zip-bomb and path-traversal guards), structured JSON logs with trace IDs, Prometheus metrics, health/readiness probes, CI.
@@ -66,8 +69,8 @@ flowchart LR
 | **Contextualize** | Rewrites follow-ups ("what about its population?") into standalone questions. Skipped when there is no history. |
 | **Router** | Uses semantic and BM25 relevance scores plus live-information keywords to choose documents or web search. Falls back to an LLM classifier only when the signals are ambiguous. |
 | **Hybrid Retrieval** | Dense search (MiniLM embeddings) and BM25, fused with RRF and reranked by a cross-encoder (`ms-marco-MiniLM-L-6-v2`). Falls back to web search if nothing relevant is found. |
-| **Web Search** | One LLM call plans the search query and detects stock tickers. Runs a DuckDuckGo search and, when relevant, fetches a live Yahoo Finance quote. |
-| **Data Analyst** | Writes pandas code from the dataset schema and sample rows, executes it in the sandbox, and repairs it once if it fails. |
+| **Web Search** | One LLM call plans the search query and detects stock tickers. Runs a DuckDuckGo search, reads the top 3 result pages and keeps their 2 most relevant passages each (cross-encoder), and fetches a live Yahoo Finance quote when relevant. In Auto mode it also runs when the documents didn't answer, keeping their passages. |
+| **Data Analyst** | Writes pandas code from the dataset schema (every sheet of a workbook) and sample rows, executes it in the sandbox, and repairs it once if it fails. Table results are returned as data for the chart. |
 | **Reasoner** | Streams a grounded, cited, Markdown-formatted answer. |
 | **Verifier** | Returns a JSON verdict (`supported` / `unsupported`) with a reason. A rejection triggers regeneration. |
 
@@ -152,11 +155,12 @@ The backend suite runs the **whole graph** through the HTTP API with determinist
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/v1/chat/stream` | Ask a question. Streams SSE events: `start`, `node_start`, `node_end`, `log`, `code`, `token`, `answer_reset`, `final`, `error` |
+| `POST` | `/api/v1/chat/stream` | Ask a question (optional `document_ids` limits retrieval to those documents). Streams SSE events: `start`, `node_start`, `node_end`, `log`, `code`, `token`, `answer_reset`, `final`, `error` |
 | `GET` | `/api/v1/conversations` · `/{id}` | List conversations / get one with its messages |
 | `PATCH` / `DELETE` | `/api/v1/conversations/{id}` | Rename / delete a conversation |
 | `POST` | `/api/v1/messages/{id}/feedback` | 👍 / 👎 on an answer |
 | `POST` | `/api/v1/documents` | Upload documents (PDF, DOCX, PPTX, TXT, MD, ZIP). Indexed in the background |
+| `POST` | `/api/v1/documents/url` | Add a public web page by URL (fetched, cleaned and indexed) |
 | `GET` / `DELETE` | `/api/v1/documents[/{id}]` | List documents with ingestion status / delete one |
 | `GET` / `DELETE` | `/api/v1/knowledge-base[/stats]` | Stats / reset everything |
 | `POST` / `GET` | `/api/v1/datasets` | Upload / list CSV and XLSX datasets |
@@ -169,6 +173,7 @@ All endpoints except health require the `X-API-Key` header when auth is enabled.
 ## Security notes
 
 - **Sandbox, in layers.** The validator rejects disallowed imports, dunder access and file or network I/O (including `df.query`/`eval`, whose string expressions would bypass AST checks). Code then runs with restricted builtins, in a short-lived subprocess with `RLIMIT_CPU`/`AS`/`FSIZE`/`NOFILE` limits and a minimal environment. That subprocess lives in a container with no internet route, a read-only root filesystem, no Linux capabilities, `no-new-privileges`, pid/memory/CPU caps, and only the datasets volume mounted (read-only).
+- **Fetching URLs** (web page reading and "add a URL") is guarded against server-side request forgery: only http(s), every redirect re-checked, and hosts that resolve to private, loopback or link-local addresses are refused, so the server can't be tricked into calling the sandbox, the vector store or cloud metadata endpoints. Pages are capped at 3 MB and 10 s.
 - **Uploads** are size-capped while streaming, type-checked by magic bytes, and parsed in memory. ZIP archives are never extracted to disk, so zip-slip is impossible by construction, and member count and uncompressed size are capped.
 - **Auth** is enforced in middleware with a constant-time comparison, so it always runs before any route dependency. Internal errors return a generic envelope with a trace ID; details go to the logs.
 

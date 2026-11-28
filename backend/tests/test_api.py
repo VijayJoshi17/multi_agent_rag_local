@@ -115,6 +115,7 @@ async def test_empty_knowledge_base_routes_to_web(client, monkeypatch):
         {"title": "Paris - Wikipedia", "href": "https://en.wikipedia.org/wiki/Paris",
          "body": "Paris is the capital of France."}
     ])
+    monkeypatch.setattr(web_search, "fetch_page", _unreachable)  # snippet fallback, offline
     events = await ask(client, "What is the capital of France?")
     final = events[-1]["message"]
     assert final["meta"]["route"] == "web_search"
@@ -125,7 +126,8 @@ async def test_empty_knowledge_base_routes_to_web(client, monkeypatch):
 async def test_data_analyst_with_self_repair(client, sandbox):
     sandbox.results = [
         ExecutionResult(ok=False, output="", error="KeyError: 'Revenue'"),
-        ExecutionResult(ok=True, output="| region | total |\n|---|---|\n| EU | 10 |"),
+        ExecutionResult(ok=True, output="| region | total |\n|---|---|\n| EU | 10 |",
+                        table={"columns": ["region", "total"], "rows": [["EU", 10]]}),
     ]
     csv = b"region,revenue\nEU,4\nEU,6\n"
     resp = await client.post("/api/v1/datasets", files={"file": ("sales.csv", csv, "text/csv")})
@@ -139,6 +141,7 @@ async def test_data_analyst_with_self_repair(client, sandbox):
     assert [e["attempt"] for e in code_events] == [1, 2]
     final = events[-1]["message"]
     assert final["meta"]["analysis"]["ok"] is True
+    assert final["meta"]["analysis"]["table"]["rows"] == [["EU", 10]]  # passed on for the chart
     assert "verify" not in [e.get("node") for e in events]
 
     preview = (await client.get(f"/api/v1/datasets/{ds['id']}/preview")).json()
@@ -217,3 +220,124 @@ async def test_refusal_skips_verification(client, llm):
     assert "verify" not in [e.get("node") for e in events]
     assert llm.calls["verifier"] == 0
     assert events[-1]["message"]["meta"]["verification"]["verdict"] == "skipped"
+
+
+# ---------------------------------------------------------------- expanded modes
+
+async def _unreachable(url):
+    from app.services.fetch import FetchError
+
+    raise FetchError("offline")
+
+
+GERMANY = "Germany is a country in Central Europe. Its capital is Berlin, home to the Reichstag."
+
+
+async def test_web_search_reads_full_pages(client, monkeypatch):
+    from app.agents import web_search
+    from app.services.fetch import Page
+
+    monkeypatch.setattr(web_search, "_ddg_search", lambda q, n: [
+        {"title": "Readable", "href": "https://a.example/page", "body": "short snippet A"},
+        {"title": "Broken", "href": "https://b.example/page", "body": "short snippet B"},
+    ])
+
+    async def fake_fetch(url):
+        if "a.example" in url:
+            body = "The Eiffel Tower is 330 metres tall. " * 40
+            return Page(url=url, title="Readable", text=body)
+        from app.services.fetch import FetchError
+
+        raise FetchError("blocked")
+
+    monkeypatch.setattr(web_search, "fetch_page", fake_fetch)
+    events = await ask(client, "How tall is the Eiffel Tower?", mode="web")
+    sources = events[-1]["message"]["sources"]
+    texts = [s["text"] for s in sources]
+    assert any("330 metres" in t for t in texts)            # passage from the full page
+    assert any("short snippet B" in t for t in texts)       # unreadable page -> snippet
+    assert not any("short snippet A" in t for t in texts)   # readable page replaces its snippet
+
+
+async def test_add_url_to_knowledge_base(client, monkeypatch):
+    from app.services import ingestion
+    from app.services.fetch import Page
+
+    async def fake_fetch(url):
+        return Page(url=url, title="Larkspur blog", text="Larkspur ships the LR-900 in 2027.")
+
+    monkeypatch.setattr(ingestion, "fetch_page", fake_fetch)
+    resp = await client.post("/api/v1/documents/url", json={"url": "https://blog.example/lr900"})
+    assert resp.status_code == 202, resp.text
+    assert resp.json()["documents"][0]["filename"] == "https://blog.example/lr900"
+    await client.app.state.container.ingestion.wait_idle()
+
+    events = await ask(client, "When does the LR-900 ship?", mode="documents")
+    src = events[-1]["message"]["sources"][0]
+    assert src["url"] == "https://blog.example/lr900" and src["kind"] == "document"
+
+
+async def test_add_url_rejects_private_addresses(client):
+    for url in ("http://127.0.0.1:8000/api", "http://169.254.169.254/latest", "file:///etc/passwd"):
+        resp = await client.post("/api/v1/documents/url", json={"url": url})
+        assert resp.status_code == 422, url
+        assert resp.json()["error"]["code"] == "fetch_failed"
+
+
+async def test_questions_can_be_scoped_to_documents(client):
+    await upload_text(client, "france.txt", FRANCE)
+    body = await upload_text(client, "germany.txt", GERMANY)
+    germany_id = body["documents"][0]["id"]
+    events = await ask(client, "What is the capital?", mode="auto", document_ids=[germany_id])
+    final = events[-1]["message"]
+    assert final["meta"]["route"] == "retrieve"
+    assert {s["source"] for s in final["sources"]} == {"germany.txt"}
+
+
+async def test_auto_falls_back_to_web_when_documents_do_not_answer(client, llm, monkeypatch):
+    from app.agents import web_search
+
+    client.app.state.container.settings.ROUTER_SEMANTIC_HIGH = 0.0  # force the document route
+    llm.replies["reasoner"] = [
+        "I couldn't find this in the available sources. Try the web.",
+        "The Eiffel Tower is 330 metres tall [2].",
+    ]
+    monkeypatch.setattr(web_search, "_ddg_search", lambda q, n: [
+        {"title": "Eiffel Tower", "href": "https://w.example/eiffel", "body": "It is 330 m tall."}
+    ])
+    monkeypatch.setattr(web_search, "fetch_page", _unreachable)
+    await upload_text(client, "france.txt", FRANCE)
+
+    events = await ask(client, "How tall is the Eiffel Tower?")
+    nodes = [e["node"] for e in events if e["type"] == "node_start"]
+    assert nodes == ["contextualize", "router", "retrieve", "reason", "web_search", "reason",
+                     "verify"]
+    assert any(e["type"] == "answer_reset" and e["reason"] == "web_fallback" for e in events)
+    final = events[-1]["message"]
+    assert {s["kind"] for s in final["sources"]} == {"document", "web"}
+    assert final["content"].startswith("The Eiffel Tower is 330")
+
+
+async def test_scoped_questions_never_go_to_the_web(client, llm):
+    llm.replies["reasoner"] = "I couldn't find this in the available sources."
+    body = await upload_text(client, "france.txt", FRANCE)
+    events = await ask(client, "How tall is it?", document_ids=[body["documents"][0]["id"]])
+    assert "web_search" not in [e.get("node") for e in events]
+
+
+async def test_multi_sheet_workbook_lists_every_sheet(client):
+    import io
+
+    import pandas as pd
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf) as xw:
+        sales = pd.DataFrame({"region": ["EU"], "revenue": [4]})
+        sales.to_excel(xw, sheet_name="sales", index=False)
+        pd.DataFrame({"name": ["Ann"]}).to_excel(xw, sheet_name="staff", index=False)
+    resp = await client.post("/api/v1/datasets", files={"file": ("book.xlsx", buf.getvalue(),
+                                                                  "application/octet-stream")})
+    assert resp.status_code == 201, resp.text
+    cols = resp.json()["columns"]
+    assert {(c["sheet"], c["name"]) for c in cols} == {
+        ("sales", "region"), ("sales", "revenue"), ("staff", "name")}

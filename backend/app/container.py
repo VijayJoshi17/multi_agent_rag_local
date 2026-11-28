@@ -80,7 +80,7 @@ class Container:
             contextualize=ContextualizerAgent(llm, settings.HISTORY_TURNS),
             router=RouterAgent(llm, embedder, store, bm25, settings),
             retrieve=RetrieverAgent(embedder, store, bm25, reranker, settings),
-            web_search=WebSearchAgent(llm, settings.WEB_SEARCH_RESULTS),
+            web_search=WebSearchAgent(llm, settings.WEB_SEARCH_RESULTS, reranker),
             data_analyst=DataAnalystAgent(llm, datasets, sandbox),
             reason=ReasonerAgent(llm),
             verify=VerifierAgent(llm),

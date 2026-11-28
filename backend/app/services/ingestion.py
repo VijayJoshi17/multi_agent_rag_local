@@ -11,13 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import Settings
-from app.core.errors import PayloadTooLargeError
 from app.core.logging import get_logger
 from app.db.models import Document, DocumentStatus
 from app.schemas.rag import Chunk
 from app.services import parsing
 from app.services.bm25 import BM25Index
 from app.services.embeddings import Embedder
+from app.services.fetch import fetch_page
 from app.services.metrics import INGESTED_CHUNKS
 from app.services.vector_store import VectorStore
 
@@ -70,7 +70,7 @@ class IngestionService:
 
     # ------------------------------------------------------------------ uploads
     def _path(self, doc: Document) -> Path:
-        return self.settings.documents_dir / f"{doc.id}{parsing.extension(doc.filename)}"
+        return self.settings.documents_dir / f"{doc.id}.{doc.content_type}"
 
     async def register_upload(self, filename: str, data: bytes) -> tuple[list[Document], list[str]]:
         ext = parsing.sniff(filename, data)
@@ -87,35 +87,41 @@ class IngestionService:
         else:
             files, skipped = [parsing.FilePayload(filename, ext, data)], []
 
+        return await self._add([(f.filename, f.ext.lstrip("."), f.data) for f in files], skipped)
+
+    async def register_url(self, url: str) -> tuple[list[Document], list[str]]:
+        """Fetch a public web page and ingest its readable text. The URL is the document name."""
+        page = await fetch_page(url)
+        text = f"# {page.title}\n\nSource: {page.url}\n\n{page.text}"
+        return await self._add([(page.url, "url", text.encode("utf-8"))], [])
+
+    async def _add(
+        self, files: list[tuple[str, str, bytes]], skipped: list[str]
+    ) -> tuple[list[Document], list[str]]:
+        """Store new files (skipping duplicates by content hash) and queue them for ingestion."""
         created: list[Document] = []
         async with self.sessionmaker() as s:
-            for f in files:
-                digest = hashlib.sha256(f.data).hexdigest()
+            for filename, content_type, data in files:
+                digest = hashlib.sha256(data).hexdigest()
                 dup = await s.scalar(
                     select(Document).where(
                         Document.content_hash == digest, Document.status != DocumentStatus.FAILED
                     )
                 )
                 if dup:
-                    skipped.append(f"{f.filename} (duplicate of {dup.filename})")
+                    skipped.append(f"{filename} (duplicate of {dup.filename})")
                     continue
-                doc = Document(
-                    filename=f.filename, content_type=f.ext.lstrip("."),
-                    size_bytes=len(f.data), content_hash=digest,
-                )
+                doc = Document(filename=filename, content_type=content_type,
+                               size_bytes=len(data), content_hash=digest)
                 s.add(doc)
                 await s.flush()
-                await run_in_threadpool(self._path(doc).write_bytes, f.data)
+                await run_in_threadpool(self._path(doc).write_bytes, data)
                 created.append(doc)
             await s.commit()
 
         for doc in created:
             self._queue.put_nowait(doc.id)
         return created, skipped
-
-    def check_size(self, size: int) -> None:
-        if size > self.settings.MAX_UPLOAD_MB * 1024 * 1024:
-            raise PayloadTooLargeError(f"File exceeds {self.settings.MAX_UPLOAD_MB} MB limit")
 
     # ------------------------------------------------------------------ deletion
     async def delete(self, doc: Document) -> None:
@@ -148,6 +154,7 @@ class IngestionService:
                     chunks.append(Chunk(
                         text=piece, source=doc.filename, document_id=doc.id,
                         chunk_index=len(chunks), page=page.page,
+                        url=doc.filename if doc.content_type == "url" else None,
                     ))
         return chunks
 
@@ -160,9 +167,7 @@ class IngestionService:
             await s.commit()
             try:
                 data = await run_in_threadpool(self._path(doc).read_bytes)
-                pages = await run_in_threadpool(
-                    parsing.extract_text, parsing.extension(doc.filename), data
-                )
+                pages = await run_in_threadpool(parsing.extract_text, f".{doc.content_type}", data)
                 chunks = self._chunk(doc, pages)
                 if not chunks:
                     raise ValueError("No extractable text found (scanned PDF or empty file?)")

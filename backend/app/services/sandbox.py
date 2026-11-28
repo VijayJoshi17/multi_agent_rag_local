@@ -15,6 +15,7 @@ class ExecutionResult:
     output: str
     error: str | None = None
     duration_ms: int = 0
+    table: dict | None = None  # result as {columns, rows} when it is a table
 
 
 class SandboxClient:
@@ -36,6 +37,7 @@ class SandboxClient:
         return ExecutionResult(
             ok=bool(body.get("ok")), output=body.get("output", ""),
             error=body.get("error"), duration_ms=int(body.get("duration_ms", 0)),
+            table=body.get("table"),
         )
 
     async def ping(self) -> bool:
